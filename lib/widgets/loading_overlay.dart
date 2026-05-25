@@ -22,13 +22,23 @@ class LoadingOverlay extends StatefulWidget {
 }
 
 class _LoadingOverlayState extends State<LoadingOverlay>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+    with TickerProviderStateMixin {
+  late AnimationController _orbitController;
+  late AnimationController _pulseController;
+  late AnimationController _shimmerController;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _orbitController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _shimmerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat();
@@ -36,7 +46,9 @@ class _LoadingOverlayState extends State<LoadingOverlay>
 
   @override
   void dispose() {
-    _controller.dispose();
+    _orbitController.dispose();
+    _pulseController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
@@ -47,8 +59,8 @@ class _LoadingOverlayState extends State<LoadingOverlay>
         IgnorePointer(
           ignoring: widget.isLoading,
           child: AnimatedOpacity(
-            opacity: widget.isLoading ? 0.3 : 1.0,
-            duration: const Duration(milliseconds: 300),
+            opacity: widget.isLoading ? 0.25 : 1.0,
+            duration: const Duration(milliseconds: 400),
             curve: Curves.easeInOut,
             child: widget.child,
           ),
@@ -56,14 +68,14 @@ class _LoadingOverlayState extends State<LoadingOverlay>
         if (widget.isLoading)
           Positioned.fill(
             child: Container(
-              color: AppColors.background.withOpacity(0.5),
+              color: AppColors.background.withValues(alpha: 0.6),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildPulsingCircle(),
-                    const SizedBox(height: 28),
-                    _buildAnimatedText(),
+                    _buildOrbitLoader(),
+                    const SizedBox(height: 36),
+                    _buildShimmerText(),
                   ],
                 ),
               ),
@@ -73,80 +85,139 @@ class _LoadingOverlayState extends State<LoadingOverlay>
     );
   }
 
-  Widget _buildPulsingCircle() {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final sineValue = math.sin(_controller.value * 2 * math.pi);
-        final scale = 0.85 + (0.2 * ((sineValue + 1) / 2));
-        final glowOpacity = 0.2 + (0.3 * ((sineValue + 1) / 2));
-
-        return Transform.scale(
-          scale: scale,
-          child: Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: SweepGradient(
-                startAngle: _controller.value * 2 * math.pi,
-                colors: [
-                  AppColors.primary,
-                  AppColors.secondary,
-                  AppColors.tertiary,
-                  AppColors.primary,
-                ],
-                stops: const [0.0, 0.33, 0.66, 1.0],
+  Widget _buildOrbitLoader() {
+    return SizedBox(
+      width: 100,
+      height: 100,
+      child: AnimatedBuilder(
+        animation: _orbitController,
+        builder: (context, child) {
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              // Pulsing outer ring
+              AnimatedBuilder(
+                animation: _pulseController,
+                builder: (_, __) {
+                  final scale = 0.88 + 0.12 * _pulseController.value;
+                  final opacity = 0.15 + 0.1 * _pulseController.value;
+                  return Transform.scale(
+                    scale: scale,
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: opacity),
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withOpacity(glowOpacity),
-                  blurRadius: 32,
-                  spreadRadius: 8,
-                ),
-                BoxShadow(
-                  color: AppColors.secondary.withOpacity(glowOpacity * 0.5),
-                  blurRadius: 48,
-                  spreadRadius: 4,
-                ),
-              ],
-            ),
-            child: Container(
-              margin: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.background,
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.auto_awesome_rounded,
-                  color: AppColors.primary.withOpacity(0.7 + (0.3 * ((sineValue + 1) / 2))),
-                  size: 28,
+              // Inner static ring
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    width: 1,
+                  ),
                 ),
               ),
-            ),
-          ),
-        );
-      },
+              // Three orbiting dots
+              ..._buildOrbitingDots(),
+              // Center dot
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildAnimatedText() {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final sineValue = math.sin(_controller.value * 2 * math.pi);
-        final opacity = 0.5 + (0.5 * ((sineValue + 1) / 2));
+  List<Widget> _buildOrbitingDots() {
+    const orbitRadius = 30.0;
+    final dots = <Widget>[];
+    for (int i = 0; i < 3; i++) {
+      final phaseOffset = (i / 3) * 2 * math.pi;
+      final angle = _orbitController.value * 2 * math.pi + phaseOffset;
+      final x = orbitRadius * math.cos(angle);
+      final y = orbitRadius * math.sin(angle);
 
-        return Opacity(
-          opacity: opacity,
+      // Dot size pulses with orbit position to give depth
+      final depthScale = 0.7 + 0.3 * ((math.sin(angle) + 1) / 2);
+      final opacity = 0.5 + 0.5 * ((math.sin(angle + math.pi) + 1) / 2);
+
+      dots.add(
+        Transform.translate(
+          offset: Offset(x, y),
+          child: Transform.scale(
+            scale: depthScale,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: opacity),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.3 * opacity),
+                    blurRadius: 6,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return dots;
+  }
+
+  Widget _buildShimmerText() {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, _) {
+        final shimmerPos = _shimmerController.value;
+        return ShaderMask(
+          shaderCallback: (bounds) {
+            return LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: const [
+                Colors.white38,
+                Colors.white,
+                Colors.white70,
+                Colors.white38,
+              ],
+              stops: [
+                (shimmerPos - 0.4).clamp(0.0, 1.0),
+                shimmerPos.clamp(0.0, 1.0),
+                (shimmerPos + 0.1).clamp(0.0, 1.0),
+                (shimmerPos + 0.4).clamp(0.0, 1.0),
+              ],
+            ).createShader(bounds);
+          },
           child: Text(
             widget.loadingText,
             style: GoogleFonts.inter(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: Colors.white70,
-              letterSpacing: 0.5,
+              color: Colors.white,
+              letterSpacing: 1.2,
             ),
           ),
         );

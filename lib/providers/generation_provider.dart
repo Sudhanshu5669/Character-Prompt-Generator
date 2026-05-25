@@ -33,6 +33,8 @@ class GenerationProvider extends ChangeNotifier {
     required ApiConfig config,
     required String type,
     Character? character,
+    String? clothesInstructions,
+    Prompt? referencePrompt,
     int count = 5,
   }) async {
     isGenerating = true;
@@ -40,13 +42,18 @@ class GenerationProvider extends ChangeNotifier {
     generatedVariations = [];
     notifyListeners();
 
+    // Convert single type to selectedCategories map for internal use
+    final selectedCategories = <String, String>{
+      type: clothesInstructions ?? '',
+    };
     try {
       final provider = _getProvider(config);
 
       final systemPrompt = _buildSystemPrompt(
         prompt: prompt,
-        type: type,
+        selectedCategories: selectedCategories,
         character: character,
+        referencePrompt: referencePrompt,
         count: count,
       );
 
@@ -73,12 +80,17 @@ class GenerationProvider extends ChangeNotifier {
 
       for (final variation in parsed) {
         if (variation is Map<String, dynamic>) {
+          final changeTitle = variation['_change_title'] as String?;
+
           if (baseJson.isNotEmpty && prompt.lockedFields.isNotEmpty) {
             final merged = mergeWithLocks(
               baseJson,
               variation,
               prompt.lockedFields,
             );
+            if (changeTitle != null) {
+              merged['_change_title'] = changeTitle;
+            }
             results.add(merged);
           } else {
             results.add(variation);
@@ -98,8 +110,9 @@ class GenerationProvider extends ChangeNotifier {
 
   String _buildSystemPrompt({
     required Prompt prompt,
-    required String type,
+    required Map<String, String> selectedCategories,
     Character? character,
+    Prompt? referencePrompt,
     int count = 5,
   }) {
     final buffer = StringBuffer();
@@ -111,61 +124,79 @@ class GenerationProvider extends ChangeNotifier {
     buffer.writeln();
     buffer.writeln('RULES:');
     buffer.writeln(
-      '1. Each object in the array must have the EXACT SAME keys as the base prompt.',
+      '1. Each object in the array must have the EXACT SAME keys as the base prompt PLUS a mandatory "_change_title" key.',
+    );
+    buffer.writeln(
+      '2. The "_change_title" field must be 3-5 words summarizing the change (e.g., "Warm Evening Smile", "Neon Club Dance").',
     );
 
     if (prompt.lockedFields.isNotEmpty) {
       final lockedList = prompt.lockedFields.join(', ');
       buffer.writeln(
-        '2. The following fields are LOCKED and must keep their EXACT original values: $lockedList',
+        '3. The following fields are LOCKED and must keep their EXACT original values: $lockedList',
       );
     } else {
-      buffer.writeln('2. No fields are locked — all fields can be varied.');
+      buffer.writeln('3. No fields are locked — all fields can be varied.');
     }
 
-    buffer.writeln('3. All other fields can be creatively varied.');
+    buffer.writeln('4. All other fields can be creatively varied.');
     buffer.writeln(
-      '4. Respond with ONLY the JSON array. No other text before or after.',
+      '5. Respond with ONLY the JSON array. No other text before or after.',
     );
     buffer.writeln();
 
-    switch (type) {
-      case 'expression':
+    // Build category-specific instructions
+    final hasRandom = selectedCategories.containsKey('random');
+
+    if (hasRandom) {
+      buffer.writeln(
+        'Generate $count creative and diverse variations of the prompt, '
+        'changing all unlocked fields freely with creative ideas.',
+      );
+      final hint = selectedCategories['random'] ?? '';
+      if (hint.trim().isNotEmpty) {
+        buffer.writeln('DIRECTION HINT: $hint');
+      }
+    } else {
+      final categories = selectedCategories.keys.toList();
+      final categoryCount = categories.length;
+
+      if (categoryCount == 1) {
+        _writeSingleCategory(buffer, categories.first, selectedCategories[categories.first] ?? '', count);
+      } else {
         buffer.writeln(
-          'Generate $count variations focusing on different facial expressions and emotions '
-          '(e.g., smiling warmly, laughing, looking contemplative, surprised, confident, shy, '
-          'angry, peaceful, excited, melancholic). Each variation should have a distinct emotional quality.',
+          'Generate $count variations that SIMULTANEOUSLY vary ALL of the following aspects together '
+          'in each variation (not separately — each output prompt should reflect changes in all these areas at once):',
         );
-        break;
-      case 'pose':
+        buffer.writeln();
+        for (final cat in categories) {
+          final hint = selectedCategories[cat] ?? '';
+          _writeCategoryBullet(buffer, cat, hint);
+        }
+        buffer.writeln();
         buffer.writeln(
-          'Generate $count variations focusing on different body poses and positions '
-          '(e.g., standing confidently, sitting casually, leaning against a wall, walking, running, '
-          'jumping, dancing, lying down, crouching, stretching). Each variation should have a distinct physical posture.',
+          'Each of the $count output prompts must reflect coordinated changes across ALL listed aspects.',
         );
-        break;
-      case 'environment':
-        buffer.writeln(
-          'Generate $count variations focusing on different environments and settings. '
-          'If the current environment suggests a specific type of location, generate variations '
-          'WITHIN that type. For example, if it mentions a club, vary within club settings '
-          '(dancing on floor, at the bar, in VIP area, near DJ booth, on the terrace). '
-          'If it mentions outdoors, vary outdoor settings.',
-        );
-        break;
-      case 'random':
-      default:
-        buffer.writeln(
-          'Generate $count creative and diverse variations of the prompt, '
-          'changing all unlocked fields freely with creative ideas.',
-        );
-        break;
+      }
     }
 
     if ((prompt.manualInstructions ?? '').trim().isNotEmpty) {
       buffer.writeln();
       buffer.writeln(
         'ADDITIONAL INSTRUCTIONS FROM USER: ${prompt.manualInstructions}',
+      );
+    }
+
+    if (referencePrompt != null) {
+      buffer.writeln();
+      buffer.writeln(
+        'REFERENCE PROMPT - Use this as inspiration for style and values while maintaining the base prompt\'s schema:',
+      );
+      buffer.writeln(referencePrompt.jsonContent);
+      buffer.writeln();
+      buffer.writeln(
+        'Instructions: Generate variations inspired by the reference prompt\'s values and style '
+        'while strictly preserving the base prompt\'s keys and schema.',
       );
     }
 
@@ -188,6 +219,82 @@ class GenerationProvider extends ChangeNotifier {
     }
 
     return buffer.toString();
+  }
+
+  void _writeSingleCategory(
+    StringBuffer buffer,
+    String category,
+    String hint,
+    int count,
+  ) {
+    switch (category) {
+      case 'expression':
+        buffer.writeln(
+          'Generate $count variations focusing on different facial expressions and emotions '
+          '(e.g., smiling warmly, laughing, contemplative, surprised, confident, shy, '
+          'angry, peaceful, excited, melancholic). Each variation should have a distinct emotional quality.',
+        );
+        break;
+      case 'pose':
+        buffer.writeln(
+          'Generate $count variations focusing on different body poses and positions '
+          '(e.g., standing confidently, sitting casually, leaning against a wall, walking, running, '
+          'jumping, dancing, lying down, crouching, stretching). Each variation should have a distinct physical posture.',
+        );
+        break;
+      case 'environment':
+        buffer.writeln(
+          'Generate $count variations focusing on different environments and settings. '
+          'If the current environment suggests a specific type of location, generate variations '
+          'WITHIN that type (e.g., if it mentions a club, vary within club settings).',
+        );
+        break;
+      case 'clothes':
+        buffer.writeln(
+          'Generate $count variations focusing on different clothing and outfits. '
+          'Vary the outfit style, colors, accessories, and overall fashion aesthetic.',
+        );
+        break;
+      default:
+        buffer.writeln(
+          'Generate $count creative and diverse variations of the prompt, '
+          'changing all unlocked fields freely with creative ideas.',
+        );
+    }
+    if (hint.trim().isNotEmpty) {
+      buffer.writeln('USER HINT: $hint');
+    }
+  }
+
+  void _writeCategoryBullet(StringBuffer buffer, String category, String hint) {
+    String label;
+    String desc;
+    switch (category) {
+      case 'expression':
+        label = 'Expression';
+        desc = 'Change facial expression and emotion';
+        break;
+      case 'pose':
+        label = 'Pose';
+        desc = 'Change body pose and posture';
+        break;
+      case 'environment':
+        label = 'Environment';
+        desc = 'Change the setting or location context';
+        break;
+      case 'clothes':
+        label = 'Clothes';
+        desc = 'Change outfit, style, and accessories';
+        break;
+      default:
+        label = category;
+        desc = 'Vary creatively';
+    }
+    if (hint.trim().isNotEmpty) {
+      buffer.writeln('• $label: $desc. User instruction: "$hint"');
+    } else {
+      buffer.writeln('• $label: $desc (AI decides freely).');
+    }
   }
 
   void clearResults() {

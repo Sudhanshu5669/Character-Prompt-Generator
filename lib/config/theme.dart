@@ -3,60 +3,48 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFF7C4DFF);
-  static const Color secondary = Color(0xFF00E5FF);
-  static const Color tertiary = Color(0xFFFF6090);
-  static const Color background = Color(0xFF0A0A1A);
-  static const Color surface = Color(0xFF141428);
-  static const Color cardColor = Color(0xFF1E1E3A);
-  static const Color error = Color(0xFFFF5252);
-  static const Color onPrimary = Colors.white;
+  static const Color primary = Colors.white;
+  static const Color secondary = Color(0xFFE0E0E0);
+  static const Color tertiary = Color(0xFF8E8E93);
+  static const Color background = Colors.black;
+  static const Color surface = Color(0xFF121212);
+  static const Color cardColor = Color(0xFF161616);
+  static const Color error = Color(0xFFCF6679);
+  static const Color onPrimary = Colors.black;
   static const Color onBackground = Colors.white;
   static const Color textSecondary = Colors.white70;
   static const Color textDisabled = Colors.white38;
-  static const Color borderSubtle = Colors.white10;
+  static const Color borderSubtle = Color(0xFF2C2C2C);
 }
 
 class AppDecorations {
   AppDecorations._();
 
   static BoxDecoration get glassmorphicCard => BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFF161616),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: AppColors.borderSubtle,
+          width: 1,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 16,
-            offset: Offset(0, 4),
-          ),
-        ],
       );
 
   static BoxDecoration get gradientCard => BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withOpacity(0.15),
-            Colors.transparent,
-          ],
+        color: const Color(0xFF121212),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.borderSubtle,
+          width: 1,
         ),
-        borderRadius: BorderRadius.circular(16),
       );
 
   static BoxDecoration get accentGradient => BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary,
-            AppColors.secondary,
-          ],
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white,
+          width: 1,
+        ),
       );
 }
 
@@ -70,7 +58,7 @@ final ThemeData appTheme = ThemeData(
     tertiary: AppColors.tertiary,
     surface: AppColors.surface,
     error: AppColors.error,
-    onPrimary: Colors.white,
+    onPrimary: Colors.black,
     onSecondary: Colors.black,
     onSurface: Colors.white,
     onError: Colors.white,
@@ -137,15 +125,16 @@ final ThemeData appTheme = ThemeData(
   cardTheme: CardThemeData(
     color: AppColors.cardColor,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: AppColors.borderSubtle, width: 1),
     ),
     elevation: 0,
     margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
   ),
   floatingActionButtonTheme: const FloatingActionButtonThemeData(
-    backgroundColor: AppColors.primary,
-    foregroundColor: Colors.white,
-    elevation: 4,
+    backgroundColor: Colors.white,
+    foregroundColor: Colors.black,
+    elevation: 2,
     shape: CircleBorder(),
   ),
   inputDecorationTheme: InputDecorationTheme(
@@ -154,15 +143,15 @@ final ThemeData appTheme = ThemeData(
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: Colors.white10),
+      borderSide: const BorderSide(color: AppColors.borderSubtle),
     ),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: Colors.white10),
+      borderSide: const BorderSide(color: AppColors.borderSubtle),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      borderSide: const BorderSide(color: Colors.white, width: 1.5),
     ),
     errorBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
@@ -183,8 +172,8 @@ final ThemeData appTheme = ThemeData(
   ),
   elevatedButtonTheme: ElevatedButtonThemeData(
     style: ElevatedButton.styleFrom(
-      backgroundColor: AppColors.primary,
-      foregroundColor: Colors.white,
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
       elevation: 0,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       shape: RoundedRectangleBorder(
@@ -199,7 +188,7 @@ final ThemeData appTheme = ThemeData(
   ),
   bottomNavigationBarTheme: const BottomNavigationBarThemeData(
     backgroundColor: AppColors.background,
-    selectedItemColor: AppColors.primary,
+    selectedItemColor: Colors.white,
     unselectedItemColor: Colors.white38,
     type: BottomNavigationBarType.fixed,
     elevation: 0,
@@ -216,7 +205,7 @@ final ThemeData appTheme = ThemeData(
   ),
   chipTheme: ChipThemeData(
     backgroundColor: AppColors.surface,
-    selectedColor: AppColors.primary.withOpacity(0.3),
+    selectedColor: Colors.white24,
     disabledColor: AppColors.surface,
     labelStyle: const TextStyle(
       color: Colors.white,
@@ -229,9 +218,9 @@ final ThemeData appTheme = ThemeData(
       fontFamily: 'Inter',
     ),
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(12),
     ),
-    side: BorderSide.none,
+    side: const BorderSide(color: AppColors.borderSubtle),
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
   ),
   snackBarTheme: SnackBarThemeData(
@@ -243,14 +232,16 @@ final ThemeData appTheme = ThemeData(
     ),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: AppColors.borderSubtle),
     ),
     behavior: SnackBarBehavior.floating,
-    elevation: 4,
+    elevation: 2,
   ),
   dialogTheme: DialogThemeData(
     backgroundColor: AppColors.surface,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16),
+      side: const BorderSide(color: AppColors.borderSubtle),
     ),
     titleTextStyle: const TextStyle(
       fontSize: 20,
@@ -263,6 +254,6 @@ final ThemeData appTheme = ThemeData(
       color: Colors.white70,
       fontFamily: 'Inter',
     ),
-    elevation: 8,
+    elevation: 4,
   ),
 );

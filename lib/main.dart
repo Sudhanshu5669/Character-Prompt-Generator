@@ -42,7 +42,7 @@ void main() async {
     Hive.openBox<Prompt>('prompts'),
     Hive.openBox<Character>('characters'),
     Hive.openBox<GeneratedPrompt>('generated_prompts'),
-    Hive.openBox('settings'),
+    Hive.openBox<ApiConfig>('settings'),
   ]);
 
   runApp(const PromptGeneratorApp());

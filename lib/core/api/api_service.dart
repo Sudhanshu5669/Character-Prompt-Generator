@@ -17,8 +17,9 @@ abstract class AiProvider {
 Dio createDioClient() {
   final dio = Dio(
     BaseOptions(
-      connectTimeout: const Duration(seconds: 60),
-      receiveTimeout: const Duration(seconds: 60),
+      connectTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 180), // AI APIs can be slow
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

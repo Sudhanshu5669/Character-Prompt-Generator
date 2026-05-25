@@ -25,6 +25,82 @@ class PromptDetailScreen extends StatefulWidget {
 
 class _PromptDetailScreenState extends State<PromptDetailScreen> {
   Character? _selectedCharacter;
+  String _selectedReferencePromptId = '__none__';
+
+  // Multi-select generation state
+  final Set<String> _selectedCategories = {'random'};
+  final Map<String, TextEditingController> _hintControllers = {
+    'expression': TextEditingController(),
+    'pose': TextEditingController(),
+    'environment': TextEditingController(),
+    'clothes': TextEditingController(),
+    'random': TextEditingController(),
+  };
+  int _promptCount = 5;
+
+  GenerationProvider? _generationProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = context.read<GenerationProvider>();
+    if (_generationProvider != provider) {
+      _generationProvider?.removeListener(_onGenerationChanged);
+      _generationProvider = provider;
+      _generationProvider!.addListener(_onGenerationChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    _generationProvider?.removeListener(_onGenerationChanged);
+    for (final c in _hintControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _onGenerationChanged() {
+    final provider = _generationProvider;
+    if (provider == null || !mounted) return;
+    if (!provider.isGenerating && provider.error == null && provider.generatedVariations.isNotEmpty) {
+      Navigator.pushNamed(context, AppRoutes.generation);
+    } else if (!provider.isGenerating && provider.error != null) {
+      _showErrorDialog(provider.error!);
+    }
+  }
+
+  void _showErrorDialog(String error) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 22),
+            const SizedBox(width: 10),
+            Text(
+              'Generation Failed',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: Colors.white, fontSize: 16),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            error,
+            style: GoogleFonts.jetBrainsMono(fontSize: 12, color: Colors.white70, height: 1.5),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Close', style: GoogleFonts.inter(color: Colors.white54)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +129,9 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
 
     final jsonContent = prompt.jsonContent;
 
+    // Get all other prompts for reference selection (excluding current)
+    final otherPrompts = promptProvider.prompts.where((p) => p.id != widget.promptId).toList();
+
     return LoadingOverlay(
       isLoading: generationProvider.isGenerating,
       child: Scaffold(
@@ -64,8 +143,9 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.cardColor.withOpacity(0.5),
+                color: AppColors.cardColor,
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
               child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
             ),
@@ -84,10 +164,11 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.cardColor.withOpacity(0.5),
+                  color: AppColors.cardColor,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
                 ),
-                child: const Icon(Icons.edit_rounded, color: AppColors.secondary, size: 20),
+                child: const Icon(Icons.edit_rounded, color: Colors.white70, size: 20),
               ),
               onPressed: () {
                 Navigator.pushNamed(
@@ -109,6 +190,10 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
               _buildJsonVisualizerCard(prompt, jsonContent),
               const SizedBox(height: 24),
 
+              // Reference Prompt Selector
+              _buildReferencePromptSelector(otherPrompts),
+              const SizedBox(height: 16),
+
               // Character selector for Context
               _buildCharacterSelector(characterProvider),
               const SizedBox(height: 28),
@@ -125,7 +210,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
               ),
               const SizedBox(height: 14),
 
-              // Variations Grid
+              // Variations Grid (2x2) + Clothes button
               _buildVariationsGrid(context, prompt, settingsProvider, generationProvider),
               const SizedBox(height: 32),
             ],
@@ -135,14 +220,93 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
     );
   }
 
+  Widget _buildReferencePromptSelector(List<Prompt> otherPrompts) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bookmark_outline_rounded,
+                  color: Colors.white70, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Reference Prompt (Optional)',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedReferencePromptId,
+                dropdownColor: AppColors.surface,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38),
+                isExpanded: true,
+                items: [
+                  const DropdownMenuItem<String>(
+                    value: '__none__',
+                    child: Text(
+                      'None (No reference prompt)',
+                      style: TextStyle(fontSize: 13, color: Colors.white54),
+                    ),
+                  ),
+                  ...otherPrompts.map((p) {
+                    return DropdownMenuItem<String>(
+                      value: p.id,
+                      child: Text(
+                        p.name,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }),
+                ],
+                onChanged: (String? val) {
+                  setState(() {
+                    _selectedReferencePromptId = val ?? '__none__';
+                  });
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildJsonVisualizerCard(Prompt prompt, Map<String, dynamic> json) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.cardColor.withOpacity(0.4),
+        color: AppColors.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.04),
+          color: Colors.white.withOpacity(0.08),
         ),
       ),
       child: Column(
@@ -161,7 +325,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: AppColors.secondary,
+                        color: Colors.white70,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -191,34 +355,34 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
                             ),
                           ],
                         ),
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: Colors.white24,
                         behavior: SnackBarBehavior.floating,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         margin: const EdgeInsets.all(16),
                       ),
                     );
                   },
-                  icon: const Icon(Icons.copy_rounded, size: 14, color: AppColors.secondary),
+                  icon: const Icon(Icons.copy_rounded, size: 14, color: Colors.white70),
                   label: Text(
                     'Copy',
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.secondary,
+                      color: Colors.white70,
                     ),
                   ),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    backgroundColor: AppColors.secondary.withOpacity(0.08),
+                    backgroundColor: Colors.white.withOpacity(0.08),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ],
             ),
           ),
-          Container(height: 1, color: Colors.white.withOpacity(0.04)),
+          Container(height: 1, color: Colors.white.withOpacity(0.08)),
           // JSON Viewer Content
           Padding(
             padding: const EdgeInsets.all(16),
@@ -242,11 +406,11 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
                           color: isLocked
-                              ? AppColors.primary.withOpacity(0.05)
+                              ? Colors.white.withOpacity(0.05)
                               : Colors.transparent,
                           border: Border.all(
                             color: isLocked
-                                ? AppColors.primary.withOpacity(0.15)
+                                ? Colors.white.withOpacity(0.15)
                                 : Colors.transparent,
                           ),
                         ),
@@ -254,7 +418,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (isLocked) ...[
-                              const Icon(Icons.lock_rounded, size: 14, color: AppColors.primary),
+                              const Icon(Icons.lock_rounded, size: 14, color: Colors.white70),
                               const SizedBox(width: 8),
                             ],
                             Text(
@@ -262,7 +426,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
                               style: GoogleFonts.firaCode(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: isLocked ? AppColors.primary : AppColors.secondary,
+                                color: isLocked ? Colors.white70 : Colors.white54,
                               ),
                             ),
                             Expanded(
@@ -281,7 +445,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
                   ),
           ),
           if (prompt.manualInstructions != null && prompt.manualInstructions!.trim().isNotEmpty) ...[
-            Container(height: 1, color: Colors.white.withOpacity(0.04)),
+            Container(height: 1, color: Colors.white.withOpacity(0.08)),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -319,10 +483,10 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardColor.withOpacity(0.4),
+        color: AppColors.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.04),
+          color: Colors.white.withOpacity(0.08),
         ),
       ),
       child: Column(
@@ -331,7 +495,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
           Row(
             children: [
               Icon(Icons.face_retouching_natural_rounded,
-                  color: AppColors.primary.withOpacity(0.7), size: 20),
+                  color: Colors.white70, size: 20),
               const SizedBox(width: 8),
               Text(
                 'Character Context (Optional)',
@@ -349,24 +513,20 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.06)),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<Character?>(
                 value: _selectedCharacter,
                 dropdownColor: AppColors.surface,
                 icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white38),
-                hint: Text(
-                  'Select a character persona...',
-                  style: GoogleFonts.inter(fontSize: 13, color: Colors.white24),
-                ),
                 isExpanded: true,
                 items: [
-                  DropdownMenuItem<Character?>(
+                  const DropdownMenuItem<Character?>(
                     value: null,
                     child: Text(
                       'None (No character context)',
-                      style: GoogleFonts.inter(fontSize: 13, color: Colors.white54),
+                      style: TextStyle(fontSize: 13, color: Colors.white54),
                     ),
                   ),
                   ...characters.map((char) {
@@ -411,170 +571,234 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
     SettingsProvider settingsProvider,
     GenerationProvider generationProvider,
   ) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.35,
+    const categories = [
+      {'id': 'expression', 'label': 'Expression', 'icon': Icons.sentiment_satisfied_alt_rounded, 'hint': 'e.g., laughing, contemplative, fierce...'},
+      {'id': 'pose',       'label': 'Pose',       'icon': Icons.accessibility_new_rounded,       'hint': 'e.g., sitting, jumping, arms crossed...'},
+      {'id': 'environment','label': 'Environment','icon': Icons.landscape_rounded,               'hint': 'e.g., rooftop at night, forest, neon alley...'},
+      {'id': 'clothes',    'label': 'Clothes',    'icon': Icons.checkroom_rounded,               'hint': 'e.g., evening dress, streetwear, armour...'},
+      {'id': 'random',     'label': 'Random',     'icon': Icons.shuffle_rounded,                 'hint': 'Optional direction hint...'},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildGenerationButton(
-          title: 'Random',
-          subtitle: '5 diverse variations',
-          icon: Icons.shuffle_rounded,
-          gradient: const LinearGradient(
-            colors: [AppColors.primary, AppColors.secondary],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+        // ── Category chips ──
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: categories.map((cat) {
+            final id = cat['id'] as String;
+            final label = cat['label'] as String;
+            final icon = cat['icon'] as IconData;
+            final selected = _selectedCategories.contains(id);
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (selected) {
+                    _selectedCategories.remove(id);
+                  } else {
+                    // Deselect 'random' when picking specific cats and vice-versa
+                    if (id == 'random') {
+                      _selectedCategories.clear();
+                    } else {
+                      _selectedCategories.remove('random');
+                    }
+                    _selectedCategories.add(id);
+                  }
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: selected ? Colors.white : AppColors.cardColor,
+                  border: Border.all(
+                    color: selected ? Colors.white : Colors.white.withValues(alpha: 0.12),
+                    width: selected ? 0 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 16, color: selected ? Colors.black : Colors.white54),
+                    const SizedBox(width: 7),
+                    Text(
+                      label,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? Colors.black : Colors.white54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 16),
+
+        // ── Per-category hint fields (only for selected) ──
+        AnimatedSize(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOutCubic,
+          child: _selectedCategories.isEmpty
+              ? const SizedBox.shrink()
+              : Column(
+                  children: _selectedCategories.map((id) {
+                    final cat = categories.firstWhere((c) => c['id'] == id);
+                    final label = cat['label'] as String;
+                    final hint = cat['hint'] as String;
+                    final icon = cat['icon'] as IconData;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: AppColors.cardColor,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(icon, size: 15, color: Colors.white54),
+                              const SizedBox(width: 8),
+                              Text(
+                                label,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                'optional hint',
+                                style: GoogleFonts.inter(fontSize: 10, color: Colors.white24),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _hintControllers[id],
+                            style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+                            maxLines: 1,
+                            decoration: InputDecoration(
+                              hintText: hint,
+                              hintStyle: GoogleFonts.inter(fontSize: 12, color: Colors.white24),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+
+        // ── Count stepper ──
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: AppColors.cardColor,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           ),
-          onTap: () => _triggerGeneration(
-            context,
-            prompt,
-            settingsProvider,
-            generationProvider,
-            'random',
+          child: Row(
+            children: [
+              const Icon(Icons.format_list_numbered_rounded, size: 18, color: Colors.white54),
+              const SizedBox(width: 10),
+              Text(
+                'Prompts to generate',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.white70),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: () { if (_promptCount > 1) setState(() => _promptCount--); },
+                child: Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.remove_rounded, size: 18, color: Colors.white70),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Text(
+                  '$_promptCount',
+                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+              ),
+              GestureDetector(
+                onTap: () { if (_promptCount < 20) setState(() => _promptCount++); },
+                child: Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.add_rounded, size: 18, color: Colors.white70),
+                ),
+              ),
+            ],
           ),
         ),
-        _buildGenerationButton(
-          title: 'Expression',
-          subtitle: 'Emotional variations',
-          icon: Icons.sentiment_satisfied_alt_rounded,
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFF5252), Color(0xFFFF7A00)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          onTap: () => _triggerGeneration(
-            context,
-            prompt,
-            settingsProvider,
-            generationProvider,
-            'expression',
-          ),
-        ),
-        _buildGenerationButton(
-          title: 'Pose',
-          subtitle: 'Action & physical posture',
-          icon: Icons.accessibility_new_rounded,
-          gradient: const LinearGradient(
-            colors: [Color(0xFF00E5FF), Color(0xFF00E676)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          onTap: () => _triggerGeneration(
-            context,
-            prompt,
-            settingsProvider,
-            generationProvider,
-            'pose',
-          ),
-        ),
-        _buildGenerationButton(
-          title: 'Environment',
-          subtitle: 'Settings & settings sub-venues',
-          icon: Icons.map_rounded,
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2979FF), Color(0xFF651FFF)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          onTap: () => _triggerGeneration(
-            context,
-            prompt,
-            settingsProvider,
-            generationProvider,
-            'environment',
+
+        const SizedBox(height: 16),
+
+        // ── Generate button ──
+        GestureDetector(
+          onTap: _selectedCategories.isEmpty
+              ? null
+              : () => _triggerGeneration(context, prompt, settingsProvider, generationProvider),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 17),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: _selectedCategories.isEmpty ? Colors.white12 : Colors.white,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  color: _selectedCategories.isEmpty ? Colors.white38 : Colors.black,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  _selectedCategories.isEmpty ? 'Select a category' : 'Generate  $_promptCount prompt${_promptCount == 1 ? '' : 's'}',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: _selectedCategories.isEmpty ? Colors.white38 : Colors.black,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildGenerationButton({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Gradient gradient,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: gradient.map((color) => color.withOpacity(0.08)) as Gradient,
-          border: Border.all(
-            color: Colors.white.withOpacity(0.04),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: gradient,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 20),
-                ),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white.withOpacity(0.15),
-                  size: 16,
-                ),
-              ],
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: Colors.white38,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _triggerGeneration(
     BuildContext context,
     Prompt prompt,
     SettingsProvider settingsProvider,
     GenerationProvider generationProvider,
-    String type,
-  ) async {
+  ) {
     if (!settingsProvider.hasValidApiKey) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -588,7 +812,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
               ),
             ],
           ),
-          backgroundColor: Colors.orange.shade800,
+          backgroundColor: Colors.grey.shade800,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
@@ -597,59 +821,38 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
       return;
     }
 
-    // Trigger variations generation
-    await generationProvider.generateVariations(
+    // Resolve reference prompt from ID
+    Prompt? referencePrompt;
+    if (_selectedReferencePromptId != '__none__') {
+      referencePrompt = context.read<PromptProvider>().getById(_selectedReferencePromptId);
+    }
+
+    // Build selectedCategories map from UI state
+    final Map<String, String> selectedCategories = {
+      for (final cat in _selectedCategories)
+        cat: _hintControllers[cat]?.text.trim() ?? '',
+    };
+
+    // If somehow empty, default to random
+    if (selectedCategories.isEmpty) {
+      selectedCategories['random'] = '';
+    }
+
+    // Determine single type string for legacy provider param.
+    // If multiple categories selected, use first non-random key;
+    // provider internally uses selectedCategories map for the prompt.
+    final type = selectedCategories.keys.first;
+    final clothesHint = selectedCategories['clothes'];
+
+    // Fire-and-forget — navigation is handled reactively by _onGenerationChanged
+    generationProvider.generateVariations(
       prompt: prompt,
       config: settingsProvider.config,
       type: type,
       character: _selectedCharacter,
+      clothesInstructions: clothesHint,
+      referencePrompt: referencePrompt,
+      count: _promptCount,
     );
-
-    if (!context.mounted) return;
-
-    if (generationProvider.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  generationProvider.error!,
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
-    } else if (generationProvider.generatedVariations.isNotEmpty) {
-      Navigator.pushNamed(context, AppRoutes.generation);
-    }
-  }
-}
-
-// Helper to support gradient mapping with opacity
-extension on Gradient {
-  Gradient map(Color Function(Color) mapper) {
-    if (this is LinearGradient) {
-      final lg = this as LinearGradient;
-      return LinearGradient(
-        colors: lg.colors.map(mapper).toList(),
-        begin: lg.begin,
-        end: lg.end,
-        stops: lg.stops,
-        tileMode: lg.tileMode,
-        transform: lg.transform,
-      );
-    }
-    return this;
   }
 }

@@ -65,16 +65,13 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
       _instructionsController.text = prompt.manualInstructions ?? '';
 
       _fields.clear();
-      if (prompt.jsonContent is Map<String, dynamic>) {
-        final map = prompt.jsonContent as Map<String, dynamic>;
-        map.forEach((key, value) {
-          _fields.add(_FieldEntry(
-            keyController: TextEditingController(text: key),
-            valueController: TextEditingController(text: value.toString()),
-            isLocked: prompt.lockedFields.contains(key),
-          ));
-        });
-      }
+      prompt.jsonContent.forEach((key, value) {
+        _fields.add(_FieldEntry(
+          keyController: TextEditingController(text: key),
+          valueController: TextEditingController(text: value.toString()),
+          isLocked: prompt.lockedFields.contains(key),
+        ));
+      });
       _syncFieldsToJson();
     }
   }
@@ -185,12 +182,12 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
             ),
             const SizedBox(width: 10),
             Text(
-              valid ? 'Valid JSON ✓' : 'Invalid JSON — please fix syntax errors',
+              valid ? 'Valid JSON' : 'Invalid JSON — please fix syntax errors',
               style: GoogleFonts.inter(fontWeight: FontWeight.w500),
             ),
           ],
         ),
-        backgroundColor: valid ? Colors.green.shade700 : Colors.red.shade700,
+        backgroundColor: valid ? Colors.white24 : Colors.grey.shade800,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -210,7 +207,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                   style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
             ],
           ),
-          backgroundColor: Colors.orange.shade800,
+          backgroundColor: Colors.white24,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
@@ -232,7 +229,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                     style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
               ],
             ),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: Colors.grey.shade800,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
@@ -297,8 +294,9 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
           icon: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.cardColor.withOpacity(0.5),
+              color: AppColors.cardColor,
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
             ),
             child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
           ),
@@ -376,9 +374,9 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                     Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        color: AppColors.cardColor.withOpacity(0.5),
+                        color: AppColors.cardColor,
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.04),
+                          color: Colors.white.withOpacity(0.08),
                         ),
                       ),
                       child: Theme(
@@ -388,9 +386,9 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                         child: ExpansionTile(
                           tilePadding: const EdgeInsets.symmetric(horizontal: 18),
                           childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                          leading: Icon(
+                          leading: const Icon(
                             Icons.edit_note_rounded,
-                            color: AppColors.primary.withOpacity(0.7),
+                            color: Colors.white70,
                             size: 22,
                           ),
                           title: Text(
@@ -426,7 +424,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
             decoration: BoxDecoration(
               color: AppColors.background,
               border: Border(
-                top: BorderSide(color: Colors.white.withOpacity(0.04)),
+                top: BorderSide(color: Colors.white.withOpacity(0.06)),
               ),
             ),
             child: GestureDetector(
@@ -436,31 +434,20 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                 padding: const EdgeInsets.symmetric(vertical: 18),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.secondary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withOpacity(0.35),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+                  color: Colors.white,
                 ),
                 child: Center(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.save_rounded, color: Colors.white, size: 22),
+                      const Icon(Icons.save_rounded, color: Colors.black, size: 22),
                       const SizedBox(width: 10),
                       Text(
                         _editingPromptId != null ? 'Update Prompt' : 'Save Prompt',
                         style: GoogleFonts.inter(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          color: Colors.black,
                           letterSpacing: 0.3,
                         ),
                       ),
@@ -480,6 +467,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         color: AppColors.surface,
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -491,7 +479,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                color: !_isJsonView ? AppColors.primary.withOpacity(0.2) : Colors.transparent,
+                color: !_isJsonView ? Colors.white.withOpacity(0.15) : Colors.transparent,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -499,7 +487,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                   Icon(
                     Icons.view_list_rounded,
                     size: 16,
-                    color: !_isJsonView ? AppColors.primary : Colors.white38,
+                    color: !_isJsonView ? Colors.white : Colors.white38,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -507,7 +495,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: !_isJsonView ? FontWeight.w600 : FontWeight.w400,
-                      color: !_isJsonView ? AppColors.primary : Colors.white38,
+                      color: !_isJsonView ? Colors.white : Colors.white38,
                     ),
                   ),
                 ],
@@ -521,7 +509,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                color: _isJsonView ? AppColors.secondary.withOpacity(0.2) : Colors.transparent,
+                color: _isJsonView ? Colors.white.withOpacity(0.15) : Colors.transparent,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -529,7 +517,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                   Icon(
                     Icons.data_object_rounded,
                     size: 16,
-                    color: _isJsonView ? AppColors.secondary : Colors.white38,
+                    color: _isJsonView ? Colors.white : Colors.white38,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -537,7 +525,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: _isJsonView ? FontWeight.w600 : FontWeight.w400,
-                      color: _isJsonView ? AppColors.secondary : Colors.white38,
+                      color: _isJsonView ? Colors.white : Colors.white38,
                     ),
                   ),
                 ],
@@ -567,12 +555,12 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   color: field.isLocked
-                      ? AppColors.primary.withOpacity(0.06)
-                      : AppColors.cardColor.withOpacity(0.4),
+                      ? Colors.white.withOpacity(0.06)
+                      : AppColors.cardColor,
                   border: Border.all(
                     color: field.isLocked
-                        ? AppColors.primary.withOpacity(0.2)
-                        : Colors.white.withOpacity(0.04),
+                        ? Colors.white.withOpacity(0.15)
+                        : Colors.white.withOpacity(0.08),
                     width: 1,
                   ),
                 ),
@@ -603,7 +591,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                     Container(
                       width: 1,
                       height: 36,
-                      color: Colors.white.withOpacity(0.06),
+                      color: Colors.white.withOpacity(0.08),
                       margin: const EdgeInsets.symmetric(horizontal: 10),
                     ),
                     Expanded(
@@ -634,16 +622,8 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
                           color: field.isLocked
-                              ? AppColors.primary.withOpacity(0.15)
+                              ? Colors.white.withOpacity(0.15)
                               : Colors.transparent,
-                          boxShadow: field.isLocked
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.primary.withOpacity(0.2),
-                                    blurRadius: 8,
-                                  )
-                                ]
-                              : null,
                         ),
                         child: Icon(
                           field.isLocked
@@ -651,7 +631,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                               : Icons.lock_open_rounded,
                           size: 18,
                           color: field.isLocked
-                              ? AppColors.primary
+                              ? Colors.white70
                               : Colors.white24,
                         ),
                       ),
@@ -664,7 +644,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                         child: Icon(
                           Icons.remove_circle_outline,
                           size: 18,
-                          color: AppColors.tertiary.withOpacity(0.6),
+                          color: Colors.white38,
                         ),
                       ),
                     ),
@@ -686,16 +666,16 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: AppColors.primary.withOpacity(0.2),
+                color: Colors.white.withOpacity(0.15),
                 width: 1.5,
               ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
+                const Icon(
                   Icons.add_rounded,
-                  color: AppColors.primary.withOpacity(0.7),
+                  color: Colors.white70,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -704,7 +684,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.primary.withOpacity(0.7),
+                    color: Colors.white70,
                   ),
                 ),
               ],
@@ -726,8 +706,8 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
             color: AppColors.surface,
             border: Border.all(
               color: _jsonValid
-                  ? Colors.white.withOpacity(0.06)
-                  : AppColors.tertiary.withOpacity(0.3),
+                  ? Colors.white.withOpacity(0.08)
+                  : Colors.white.withOpacity(0.3),
               width: 1,
             ),
           ),
@@ -758,14 +738,14 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
               Expanded(
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline_rounded,
-                        color: AppColors.tertiary, size: 16),
+                    const Icon(Icons.error_outline_rounded,
+                        color: Colors.white70, size: 16),
                     const SizedBox(width: 6),
                     Text(
                       'Invalid JSON syntax',
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: AppColors.tertiary,
+                        color: Colors.white70,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -780,20 +760,21 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
-                  color: AppColors.primary.withOpacity(0.12),
+                  color: Colors.white.withOpacity(0.1),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.check_circle_outline_rounded,
-                        color: AppColors.primary, size: 16),
+                    const Icon(Icons.check_circle_outline_rounded,
+                        color: Colors.white70, size: 16),
                     const SizedBox(width: 6),
                     Text(
                       'Validate',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                        color: Colors.white70,
                       ),
                     ),
                   ],
@@ -827,7 +808,7 @@ class _PromptEditorScreenState extends State<PromptEditorScreen>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
         color: AppColors.surface,
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: TextField(
         controller: controller,

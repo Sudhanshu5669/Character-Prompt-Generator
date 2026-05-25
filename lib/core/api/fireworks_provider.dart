@@ -78,12 +78,19 @@ class FireworksProvider implements AiProvider {
 
       return content;
     } on DioException catch (e) {
-      final statusCode = e.response?.statusCode;
-      final body = e.response?.data;
-      throw Exception(
-        'Fireworks request failed (HTTP $statusCode): '
-        '${body ?? e.message}',
-      );
+      if (e.response != null) {
+        // Server responded with an error HTTP code
+        final statusCode = e.response!.statusCode;
+        final body = e.response!.data;
+        throw Exception(
+          'Fireworks request failed (HTTP $statusCode): $body',
+        );
+      } else {
+        // No response at all — connection-level failure
+        throw Exception(
+          'Fireworks connection failed [${e.type.name}]: ${e.message ?? e.error ?? "No details"}',
+        );
+      }
     }
   }
 }

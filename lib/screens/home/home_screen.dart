@@ -80,14 +80,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.secondary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.4),
+                      color: Colors.black.withOpacity(0.3),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -101,12 +97,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       Navigator.pushNamed(context, AppRoutes.characterEditor);
                     }
                   },
-                  backgroundColor: Colors.transparent,
+                  backgroundColor: Colors.white,
                   elevation: 0,
                   hoverElevation: 0,
                   focusElevation: 0,
                   highlightElevation: 0,
-                  child: const Icon(Icons.add_rounded, size: 28, color: Colors.white),
+                  child: const Icon(Icons.add_rounded, size: 28, color: Colors.black),
                 ),
               ),
             )
@@ -121,17 +117,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         color: AppColors.surface,
         border: Border(
           top: BorderSide(
-            color: AppColors.primary.withOpacity(0.15),
+            color: Colors.white.withOpacity(0.08),
             width: 1,
           ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
       ),
       child: SafeArea(
         child: Padding(
@@ -189,7 +178,7 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          color: isSelected ? AppColors.primary.withOpacity(0.15) : Colors.transparent,
+          color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -198,7 +187,7 @@ class _NavItem extends StatelessWidget {
               duration: const Duration(milliseconds: 250),
               child: Icon(
                 icon,
-                color: isSelected ? AppColors.primary : Colors.white38,
+                color: isSelected ? Colors.white : Colors.white38,
                 size: isSelected ? 26 : 24,
               ),
             ),
@@ -208,7 +197,7 @@ class _NavItem extends StatelessWidget {
               style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? AppColors.primary : Colors.white38,
+                color: isSelected ? Colors.white : Colors.white38,
               ),
               child: Text(label),
             ),
@@ -219,11 +208,7 @@ class _NavItem extends StatelessWidget {
               width: isSelected ? 20 : 0,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(2),
-                gradient: isSelected
-                    ? const LinearGradient(
-                        colors: [AppColors.primary, AppColors.secondary],
-                      )
-                    : null,
+                color: isSelected ? Colors.white70 : null,
               ),
             ),
           ],
@@ -245,6 +230,8 @@ class _PromptsTab extends StatefulWidget {
 
 class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderStateMixin {
   late AnimationController _listAnimController;
+  bool _isSelectMode = false;
+  Set<String> _selectedIds = {};
 
   @override
   void initState() {
@@ -260,6 +247,69 @@ class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderState
   void dispose() {
     _listAnimController.dispose();
     super.dispose();
+  }
+
+  void _enterSelectMode(String promptId) {
+    setState(() {
+      _isSelectMode = true;
+      _selectedIds = {promptId};
+    });
+  }
+
+  void _exitSelectMode() {
+    setState(() {
+      _isSelectMode = false;
+      _selectedIds = {};
+    });
+  }
+
+  void _toggleSelection(String promptId) {
+    setState(() {
+      if (_selectedIds.contains(promptId)) {
+        _selectedIds.remove(promptId);
+        if (_selectedIds.isEmpty) {
+          _isSelectMode = false;
+        }
+      } else {
+        _selectedIds.add(promptId);
+      }
+    });
+  }
+
+  Future<void> _confirmDeleteSelected(BuildContext context) async {
+    final count = _selectedIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Delete $count Prompt${count == 1 ? '' : 's'}',
+          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+        content: Text(
+          'Are you sure you want to delete $count selected prompt${count == 1 ? '' : 's'}? This action cannot be undone.',
+          style: GoogleFonts.inter(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete', style: GoogleFonts.inter(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      final provider = context.read<PromptProvider>();
+      for (final id in _selectedIds) {
+        provider.deletePrompt(id);
+      }
+      _exitSelectMode();
+    }
   }
 
   String _relativeTime(DateTime dateTime) {
@@ -311,7 +361,7 @@ class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderState
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Delete', style: GoogleFonts.inter(color: AppColors.tertiary)),
+            child: Text('Delete', style: GoogleFonts.inter(color: Colors.white)),
           ),
         ],
       ),
@@ -334,40 +384,56 @@ class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderState
               backgroundColor: AppColors.background,
               elevation: 0,
               toolbarHeight: 70,
-              title: ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.primary, AppColors.secondary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ).createShader(bounds),
-                child: Text(
-                  'PromptForge',
-                  style: GoogleFonts.inter(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              actions: [
-                Container(
-                  margin: const EdgeInsets.only(right: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${prompts.length} prompt${prompts.length == 1 ? '' : 's'}',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
+              title: _isSelectMode
+                  ? Text(
+                      '${_selectedIds.length} selected',
+                      style: GoogleFonts.inter(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      'PromptForge',
+                      style: GoogleFonts.inter(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
-                ),
-              ],
+              actions: _isSelectMode
+                  ? [
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Colors.white70),
+                        tooltip: 'Delete Selected',
+                        onPressed: () => _confirmDeleteSelected(context),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                        tooltip: 'Cancel Selection',
+                        onPressed: _exitSelectMode,
+                      ),
+                    ]
+                  : [
+                      Container(
+                        margin: const EdgeInsets.only(right: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        ),
+                        child: Text(
+                          '${prompts.length} prompt${prompts.length == 1 ? '' : 's'}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
             ),
             if (prompts.isEmpty)
               SliverFillRemaining(child: _buildEmptyState(context))
@@ -420,17 +486,12 @@ class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderState
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.2),
-                    AppColors.primary.withOpacity(0.02),
-                  ],
-                ),
+                color: Colors.white.withOpacity(0.05),
               ),
               child: Icon(
                 Icons.article_outlined,
                 size: 56,
-                color: AppColors.primary.withOpacity(0.6),
+                color: Colors.white.withOpacity(0.3),
               ),
             ),
             const SizedBox(height: 28),
@@ -459,14 +520,10 @@ class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderState
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.secondary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: Colors.black.withOpacity(0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -475,14 +532,14 @@ class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderState
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                    const Icon(Icons.add_rounded, color: Colors.black, size: 22),
                     const SizedBox(width: 10),
                     Text(
                       'Create Prompt',
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: Colors.black,
                       ),
                     ),
                   ],
@@ -496,137 +553,106 @@ class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderState
   }
 
   Widget _buildPromptCard(BuildContext context, Prompt prompt) {
-    Map<String, dynamic> fields = {};
-    try {
-      if (prompt.jsonContent.isNotEmpty) {
-        fields = Map<String, dynamic>.from(
-          (prompt.jsonContent is String)
-              ? {}
-              : prompt.jsonContent as Map<String, dynamic>,
-        );
-      }
-    } catch (_) {}
+    final Map<String, dynamic> fields = prompt.jsonContent;
     final fieldCount = fields.length;
     final lockedCount = prompt.lockedFields.length;
+    final isSelected = _selectedIds.contains(prompt.id);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Dismissible(
-        key: ValueKey(prompt.id),
-        direction: DismissDirection.endToStart,
-        background: Container(
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.only(right: 24),
-          margin: const EdgeInsets.symmetric(vertical: 2),
+      child: GestureDetector(
+        onTap: _isSelectMode
+            ? () => _toggleSelection(prompt.id)
+            : () => Navigator.pushNamed(
+                  context,
+                  AppRoutes.promptDetail,
+                  arguments: prompt.id,
+                ),
+        onLongPress: _isSelectMode
+            ? null
+            : () => _enterSelectMode(prompt.id),
+        child: Container(
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              colors: [
-                AppColors.tertiary.withOpacity(0.1),
-                AppColors.tertiary.withOpacity(0.3),
-              ],
+            color: isSelected
+                ? Colors.white.withOpacity(0.12)
+                : AppColors.cardColor,
+            border: Border.all(
+              color: isSelected
+                  ? Colors.white.withOpacity(0.3)
+                  : Colors.white.withOpacity(0.08),
+              width: isSelected ? 1.5 : 1,
             ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
             children: [
-              Icon(Icons.delete_rounded, color: AppColors.tertiary, size: 28),
-              const SizedBox(height: 4),
-              Text(
-                'Delete',
-                style: GoogleFonts.inter(
-                  color: AppColors.tertiary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        confirmDismiss: (_) async {
-          await _confirmDelete(context, prompt);
-          return false;
-        },
-        child: GestureDetector(
-          onTap: () => Navigator.pushNamed(
-            context,
-            AppRoutes.promptDetail,
-            arguments: prompt.id,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: AppColors.cardColor.withOpacity(0.7),
-              border: Border.all(
-                color: AppColors.primary.withOpacity(0.08),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
+              if (_isSelectMode) ...[
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: 24,
+                  height: 24,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primary.withOpacity(0.3),
-                        AppColors.secondary.withOpacity(0.15),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                    shape: BoxShape.circle,
+                    color: isSelected ? Colors.white : Colors.transparent,
+                    border: Border.all(
+                      color: isSelected ? Colors.white : Colors.white38,
+                      width: 2,
                     ),
                   ),
-                  child: Center(
-                    child: Icon(
-                      Icons.data_object_rounded,
-                      color: AppColors.primary,
-                      size: 26,
-                    ),
-                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check_rounded, size: 16, color: Colors.black)
+                      : null,
                 ),
                 const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        prompt.name,
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _buildChip(
-                            '$fieldCount field${fieldCount == 1 ? '' : 's'}',
-                            AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          if (lockedCount > 0)
-                            _buildChip(
-                              '$lockedCount locked',
-                              AppColors.secondary,
-                            ),
-                        ],
-                      ),
-                    ],
+              ],
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: Colors.white.withOpacity(0.08),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.data_object_rounded,
+                    color: Colors.white70,
+                    size: 26,
                   ),
                 ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      prompt.name,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _buildChip(
+                          '$fieldCount field${fieldCount == 1 ? '' : 's'}',
+                        ),
+                        const SizedBox(width: 8),
+                        if (lockedCount > 0)
+                          _buildChip(
+                            '$lockedCount locked',
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (!_isSelectMode) ...[
                 const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -647,26 +673,27 @@ class _PromptsTabState extends State<_PromptsTab> with SingleTickerProviderState
                   ],
                 ),
               ],
-            ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildChip(String text, Color color) {
+  Widget _buildChip(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
       child: Text(
         text,
         style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w500,
-          color: color,
+          color: Colors.white60,
         ),
       ),
     );
@@ -723,7 +750,7 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Delete', style: GoogleFonts.inter(color: AppColors.tertiary)),
+            child: Text('Delete', style: GoogleFonts.inter(color: Colors.white)),
           ),
         ],
       ),
@@ -746,20 +773,13 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
               backgroundColor: AppColors.background,
               elevation: 0,
               toolbarHeight: 70,
-              title: ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.secondary, AppColors.primary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ).createShader(bounds),
-                child: Text(
-                  'Characters',
-                  style: GoogleFonts.inter(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
+              title: Text(
+                'Characters',
+                style: GoogleFonts.inter(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
                 ),
               ),
               actions: [
@@ -767,14 +787,15 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
                   margin: const EdgeInsets.only(right: 16),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppColors.secondary.withOpacity(0.12),
+                    color: Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
                   ),
                   child: Text(
                     '${characters.length} character${characters.length == 1 ? '' : 's'}',
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: AppColors.secondary,
+                      color: Colors.white70,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -835,17 +856,12 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.secondary.withOpacity(0.2),
-                    AppColors.secondary.withOpacity(0.02),
-                  ],
-                ),
+                color: Colors.white.withOpacity(0.05),
               ),
               child: Icon(
                 Icons.people_outline_rounded,
                 size: 56,
-                color: AppColors.secondary.withOpacity(0.6),
+                color: Colors.white.withOpacity(0.3),
               ),
             ),
             const SizedBox(height: 28),
@@ -874,14 +890,10 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.secondary, AppColors.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.secondary.withOpacity(0.3),
+                      color: Colors.black.withOpacity(0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
@@ -890,14 +902,14 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                    const Icon(Icons.add_rounded, color: Colors.black, size: 22),
                     const SizedBox(width: 10),
                     Text(
                       'Create Character',
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: Colors.black,
                       ),
                     ),
                   ],
@@ -922,18 +934,11 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: AppColors.cardColor.withOpacity(0.7),
+          color: AppColors.cardColor,
           border: Border.all(
-            color: AppColors.secondary.withOpacity(0.08),
+            color: Colors.white.withOpacity(0.08),
             width: 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -943,14 +948,8 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
               height: 64,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withOpacity(0.25),
-                    AppColors.secondary.withOpacity(0.15),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Colors.white.withOpacity(0.08),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
               child: Center(
                 child: Text(
@@ -982,14 +981,15 @@ class _CharactersTabState extends State<_CharactersTab> with SingleTickerProvide
                     .map((trait) => Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: Colors.white.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.white.withOpacity(0.06)),
                           ),
                           child: Text(
                             trait,
                             style: GoogleFonts.inter(
                               fontSize: 10,
-                              color: AppColors.primary.withOpacity(0.8),
+                              color: Colors.white60,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1058,7 +1058,7 @@ class _SettingsTabState extends State<_SettingsTab> {
                 Text('Connection successful!', style: GoogleFonts.inter(fontWeight: FontWeight.w500)),
               ],
             ),
-            backgroundColor: Colors.green.shade700,
+            backgroundColor: Colors.white24,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
@@ -1083,7 +1083,7 @@ class _SettingsTabState extends State<_SettingsTab> {
                 ),
               ],
             ),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: Colors.grey.shade800,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.all(16),
@@ -1108,20 +1108,13 @@ class _SettingsTabState extends State<_SettingsTab> {
               backgroundColor: AppColors.background,
               elevation: 0,
               toolbarHeight: 70,
-              title: ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [AppColors.tertiary, AppColors.primary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ).createShader(bounds),
-                child: Text(
-                  'Settings',
-                  style: GoogleFonts.inter(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
+              title: Text(
+                'Settings',
+                style: GoogleFonts.inter(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
                 ),
               ),
             ),
@@ -1134,16 +1127,9 @@ class _SettingsTabState extends State<_SettingsTab> {
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(18),
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary.withOpacity(0.12),
-                          AppColors.secondary.withOpacity(0.06),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: AppColors.cardColor,
                       border: Border.all(
-                        color: AppColors.primary.withOpacity(0.15),
+                        color: Colors.white.withOpacity(0.1),
                         width: 1,
                       ),
                     ),
@@ -1153,12 +1139,12 @@ class _SettingsTabState extends State<_SettingsTab> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.15),
+                            color: Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(
                             Icons.info_outline_rounded,
-                            color: AppColors.primary,
+                            color: Colors.white70,
                             size: 22,
                           ),
                         ),
@@ -1206,7 +1192,7 @@ class _SettingsTabState extends State<_SettingsTab> {
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
-                      color: AppColors.cardColor.withOpacity(0.5),
+                      color: AppColors.cardColor,
                     ),
                     child: Row(
                       children: [
@@ -1218,27 +1204,15 @@ class _SettingsTabState extends State<_SettingsTab> {
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(14),
-                                gradient: isGemini
-                                    ? const LinearGradient(
-                                        colors: [AppColors.primary, Color(0xFF5C35CC)],
-                                      )
-                                    : null,
-                                boxShadow: isGemini
-                                    ? [
-                                        BoxShadow(
-                                          color: AppColors.primary.withOpacity(0.3),
-                                          blurRadius: 12,
-                                        )
-                                      ]
-                                    : null,
+                                color: isGemini ? Colors.white : Colors.transparent,
                               ),
                               child: Center(
                                 child: Text(
-                                  '✨ Gemini',
+                                  'Gemini',
                                   style: GoogleFonts.inter(
                                     fontSize: 14,
                                     fontWeight: isGemini ? FontWeight.w600 : FontWeight.w400,
-                                    color: isGemini ? Colors.white : Colors.white38,
+                                    color: isGemini ? Colors.black : Colors.white38,
                                   ),
                                 ),
                               ),
@@ -1253,27 +1227,15 @@ class _SettingsTabState extends State<_SettingsTab> {
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(14),
-                                gradient: !isGemini
-                                    ? const LinearGradient(
-                                        colors: [AppColors.tertiary, Color(0xFFCC3560)],
-                                      )
-                                    : null,
-                                boxShadow: !isGemini
-                                    ? [
-                                        BoxShadow(
-                                          color: AppColors.tertiary.withOpacity(0.3),
-                                          blurRadius: 12,
-                                        )
-                                      ]
-                                    : null,
+                                color: !isGemini ? Colors.white : Colors.transparent,
                               ),
                               child: Center(
                                 child: Text(
-                                  '🔥 Fireworks',
+                                  'Fireworks',
                                   style: GoogleFonts.inter(
                                     fontSize: 14,
                                     fontWeight: !isGemini ? FontWeight.w600 : FontWeight.w400,
-                                    color: !isGemini ? Colors.white : Colors.white38,
+                                    color: !isGemini ? Colors.black : Colors.white38,
                                   ),
                                 ),
                               ),
@@ -1287,7 +1249,7 @@ class _SettingsTabState extends State<_SettingsTab> {
                   const SizedBox(height: 28),
 
                   // Gemini section
-                  _buildSectionHeader('Gemini Configuration', '✨'),
+                  _buildSectionHeader('Gemini Configuration'),
                   const SizedBox(height: 12),
                   _buildSettingsField(
                     label: 'API Key',
@@ -1315,7 +1277,7 @@ class _SettingsTabState extends State<_SettingsTab> {
                   const SizedBox(height: 28),
 
                   // Fireworks section
-                  _buildSectionHeader('Fireworks Configuration', '🔥'),
+                  _buildSectionHeader('Fireworks Configuration'),
                   const SizedBox(height: 12),
                   _buildSettingsField(
                     label: 'API Key',
@@ -1350,22 +1312,7 @@ class _SettingsTabState extends State<_SettingsTab> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        gradient: LinearGradient(
-                          colors: _isTesting
-                              ? [Colors.white12, Colors.white10]
-                              : [AppColors.primary, AppColors.secondary],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        boxShadow: _isTesting
-                            ? null
-                            : [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.3),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
+                        color: _isTesting ? Colors.white12 : Colors.white,
                       ),
                       child: Center(
                         child: _isTesting
@@ -1394,14 +1341,14 @@ class _SettingsTabState extends State<_SettingsTab> {
                             : Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.wifi_tethering_rounded, color: Colors.white, size: 20),
+                                  const Icon(Icons.wifi_tethering_rounded, color: Colors.black, size: 20),
                                   const SizedBox(width: 10),
                                   Text(
                                     'Test Connection',
                                     style: GoogleFonts.inter(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white,
+                                      color: Colors.black,
                                     ),
                                   ),
                                 ],
@@ -1444,20 +1391,14 @@ class _SettingsTabState extends State<_SettingsTab> {
     );
   }
 
-  Widget _buildSectionHeader(String title, String emoji) {
-    return Row(
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 18)),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-      ],
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
     );
   }
 
@@ -1485,7 +1426,7 @@ class _SettingsTabState extends State<_SettingsTab> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             color: AppColors.surface,
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
           ),
           child: TextField(
             controller: controller,

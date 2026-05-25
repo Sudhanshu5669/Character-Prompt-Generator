@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Trust system CAs (standard certificates) -->
+            <certificates src="system"/>
+            <!-- Trust user-installed CAs.
+                 Required for Android 9 and below where Let's Encrypt ISRG Root X1
+                 (used by api.fireworks.ai) is NOT in the system store. -->
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

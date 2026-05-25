@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,7 +24,6 @@ class GenerationScreen extends StatefulWidget {
 class _GenerationScreenState extends State<GenerationScreen>
     with TickerProviderStateMixin {
   late AnimationController _pulseController;
-  late AnimationController _rotateController;
   late AnimationController _dotsController;
 
   @override
@@ -36,11 +34,6 @@ class _GenerationScreenState extends State<GenerationScreen>
       duration: const Duration(milliseconds: 1200),
     )..repeat(reverse: true);
 
-    _rotateController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat();
-
     _dotsController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -50,19 +43,27 @@ class _GenerationScreenState extends State<GenerationScreen>
   @override
   void dispose() {
     _pulseController.dispose();
-    _rotateController.dispose();
     _dotsController.dispose();
     super.dispose();
   }
 
   void _copyAll(List<Map<String, dynamic>> variations) {
-    final jsonStr = const JsonEncoder.withIndent('  ').convert(variations);
+    // Strip _change_title when copying all
+    final cleanVariations = variations.map((v) {
+      final copy = Map<String, dynamic>.from(v);
+      copy.remove('_change_title');
+      return copy;
+    }).toList();
+    final jsonStr = const JsonEncoder.withIndent('  ').convert(cleanVariations);
     copyToClipboard(jsonStr);
     _showCopySnackbar('All variations copied to clipboard');
   }
 
   void _copySingle(Map<String, dynamic> variation) {
-    final jsonStr = prettyJson(variation);
+    // Strip _change_title when copying
+    final copy = Map<String, dynamic>.from(variation);
+    copy.remove('_change_title');
+    final jsonStr = prettyJson(copy);
     copyToClipboard(jsonStr);
     _showCopySnackbar('Variation copied to clipboard');
   }
@@ -78,7 +79,7 @@ class _GenerationScreenState extends State<GenerationScreen>
             Text(message, style: GoogleFonts.inter(fontSize: 14)),
           ],
         ),
-        backgroundColor: AppColors.primary.withOpacity(0.9),
+        backgroundColor: Colors.white24,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         duration: const Duration(seconds: 2),
@@ -89,22 +90,25 @@ class _GenerationScreenState extends State<GenerationScreen>
 
   void _saveAsPrompt(Map<String, dynamic> variation, int index) {
     final promptProvider = context.read<PromptProvider>();
+    // Extract change title for prompt name
+    final changeTitle = variation['_change_title'] as String?;
+    final promptName = changeTitle ?? 'Generated Variation ${index + 1}';
+
+    // Create clean JSON without _change_title
+    final cleanVariation = Map<String, dynamic>.from(variation);
+    cleanVariation.remove('_change_title');
+
     final prompt = Prompt(
       id: const Uuid().v4(),
-      name: 'Generated Variation ${index + 1}',
-      jsonContentRaw: const JsonEncoder.withIndent('  ').convert(variation),
+      name: promptName,
+      jsonContentRaw: const JsonEncoder.withIndent('  ').convert(cleanVariation),
       lockedFields: [],
       manualInstructions: '',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
     promptProvider.addPrompt(prompt);
-    _showCopySnackbar('Saved as new prompt: "${prompt.name}"');
-  }
-
-  Color _accentColorForIndex(int index) {
-    const colors = [AppColors.primary, AppColors.secondary, AppColors.tertiary];
-    return colors[index % colors.length];
+    _showCopySnackbar('Saved as new prompt: "$promptName"');
   }
 
   @override
@@ -117,13 +121,14 @@ class _GenerationScreenState extends State<GenerationScreen>
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
             fontSize: 20,
+            color: Colors.white,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
@@ -131,7 +136,7 @@ class _GenerationScreenState extends State<GenerationScreen>
             builder: (context, provider, _) {
               if (provider.generatedVariations.isNotEmpty) {
                 return IconButton(
-                  icon: const Icon(Icons.copy_all_rounded),
+                  icon: const Icon(Icons.copy_all_rounded, color: Colors.white70),
                   tooltip: 'Copy All',
                   onPressed: () => _copyAll(provider.generatedVariations),
                 );
@@ -166,50 +171,26 @@ class _GenerationScreenState extends State<GenerationScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Simple pulsing circle
           AnimatedBuilder(
-            animation: Listenable.merge([_pulseController, _rotateController]),
+            animation: _pulseController,
             builder: (context, child) {
-              final scale = 0.85 + (_pulseController.value * 0.3);
-              return Transform.rotate(
-                angle: _rotateController.value * 2 * math.pi,
-                child: Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: SweepGradient(
-                        colors: [
-                          AppColors.primary,
-                          AppColors.secondary,
-                          AppColors.tertiary,
-                          AppColors.primary,
-                        ],
-                        stops: const [0.0, 0.33, 0.66, 1.0],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withOpacity(0.4 * _pulseController.value),
-                          blurRadius: 30 + (20 * _pulseController.value),
-                          spreadRadius: 5 * _pulseController.value,
-                        ),
-                      ],
-                    ),
-                    child: Container(
-                      margin: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.background,
-                      ),
-                      child: Center(
-                        child: Icon(
-                          Icons.auto_awesome_rounded,
-                          color: AppColors.primary.withOpacity(0.7 + (0.3 * _pulseController.value)),
-                          size: 36,
-                        ),
-                      ),
-                    ),
+              final scale = 0.9 + (_pulseController.value * 0.1);
+              return Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.3 + (0.3 * _pulseController.value)),
+                    width: 2,
+                  ),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: Colors.white.withOpacity(0.7 + (0.3 * _pulseController.value)),
+                    size: 32,
                   ),
                 ),
               );
@@ -239,9 +220,9 @@ class _GenerationScreenState extends State<GenerationScreen>
               animation: _pulseController,
               builder: (context, child) {
                 return LinearProgressIndicator(
-                  backgroundColor: AppColors.surface,
+                  backgroundColor: Colors.white.withOpacity(0.1),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    Color.lerp(AppColors.primary, AppColors.secondary, _pulseController.value)!,
+                    Colors.white.withOpacity(0.5 + (0.3 * _pulseController.value)),
                   ),
                   borderRadius: BorderRadius.circular(4),
                 );
@@ -263,16 +244,9 @@ class _GenerationScreenState extends State<GenerationScreen>
             borderRadius: BorderRadius.circular(20),
             color: AppColors.cardColor,
             border: Border.all(
-              color: Colors.redAccent.withOpacity(0.5),
-              width: 1.5,
+              color: Colors.white.withOpacity(0.15),
+              width: 1,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.redAccent.withOpacity(0.1),
-                blurRadius: 20,
-                spreadRadius: 2,
-              ),
-            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -281,11 +255,11 @@ class _GenerationScreenState extends State<GenerationScreen>
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.redAccent.withOpacity(0.15),
+                  color: Colors.white.withOpacity(0.1),
                 ),
                 child: const Icon(
                   Icons.error_outline_rounded,
-                  color: Colors.redAccent,
+                  color: Colors.white70,
                   size: 44,
                 ),
               ),
@@ -313,14 +287,17 @@ class _GenerationScreenState extends State<GenerationScreen>
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 18, color: Colors.black),
                   label: Text(
                     'Try Again',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -343,7 +320,7 @@ class _GenerationScreenState extends State<GenerationScreen>
           Icon(
             Icons.auto_awesome_outlined,
             size: 64,
-            color: AppColors.primary.withOpacity(0.4),
+            color: Colors.white.withOpacity(0.3),
           ),
           const SizedBox(height: 16),
           Text(
@@ -366,10 +343,12 @@ class _GenerationScreenState extends State<GenerationScreen>
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
           itemCount: variations.length,
           itemBuilder: (context, index) {
+            // Extract change title
+            final changeTitle = variations[index]['_change_title'] as String?;
             return _AnimatedVariationCard(
               index: index,
               variation: variations[index],
-              accentColor: _accentColorForIndex(index),
+              changeTitle: changeTitle,
               onCopy: () => _copySingle(variations[index]),
               onSave: () => _saveAsPrompt(variations[index], index),
             );
@@ -387,11 +366,12 @@ class _GenerationScreenState extends State<GenerationScreen>
 
   Widget _buildCopyAllButton(List<Map<String, dynamic>> variations) {
     return Container(
-      decoration: AppDecorations.accentGradient.copyWith(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -407,14 +387,14 @@ class _GenerationScreenState extends State<GenerationScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.copy_all_rounded, color: Colors.white, size: 22),
+                const Icon(Icons.copy_all_rounded, color: Colors.black, size: 22),
                 const SizedBox(width: 10),
                 Text(
                   'Copy All Variations',
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: Colors.black,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -430,14 +410,14 @@ class _GenerationScreenState extends State<GenerationScreen>
 class _AnimatedVariationCard extends StatefulWidget {
   final int index;
   final Map<String, dynamic> variation;
-  final Color accentColor;
+  final String? changeTitle;
   final VoidCallback onCopy;
   final VoidCallback onSave;
 
   const _AnimatedVariationCard({
     required this.index,
     required this.variation,
-    required this.accentColor,
+    this.changeTitle,
     required this.onCopy,
     required this.onSave,
   });
@@ -508,7 +488,13 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
         opacity: _fadeAnimation,
         child: Container(
           margin: const EdgeInsets.only(bottom: 16),
-          decoration: AppDecorations.glassmorphicCard,
+          decoration: BoxDecoration(
+            color: AppColors.cardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.08),
+            ),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -523,6 +509,8 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
   }
 
   Widget _buildHeader() {
+    final displayTitle = widget.changeTitle ?? 'Variation ${widget.index + 1}';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(0, 16, 16, 12),
       child: Row(
@@ -531,19 +519,12 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
             width: 4,
             height: 32,
             margin: const EdgeInsets.only(left: 0),
-            decoration: BoxDecoration(
-              color: widget.accentColor,
-              borderRadius: const BorderRadius.only(
+            decoration: const BoxDecoration(
+              color: Colors.white70,
+              borderRadius: BorderRadius.only(
                 topRight: Radius.circular(4),
                 bottomRight: Radius.circular(4),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: widget.accentColor.withOpacity(0.5),
-                  blurRadius: 8,
-                  offset: const Offset(2, 0),
-                ),
-              ],
             ),
           ),
           const SizedBox(width: 16),
@@ -551,15 +532,15 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
-              color: widget.accentColor.withOpacity(0.15),
+              color: Colors.white.withOpacity(0.1),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
             ),
             child: Text(
-              'Variation ${widget.index + 1}',
+              displayTitle,
               style: GoogleFonts.inter(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: widget.accentColor,
-                letterSpacing: 0.5,
+                color: Colors.white,
               ),
             ),
           ),
@@ -569,13 +550,17 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
   }
 
   Widget _buildJsonBody() {
-    final jsonStr = prettyJson(widget.variation);
+    // Create a copy without _change_title for display
+    final displayVariation = Map<String, dynamic>.from(widget.variation);
+    displayVariation.remove('_change_title');
+
+    final jsonStr = prettyJson(displayVariation);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.background.withOpacity(0.6),
+        color: AppColors.background,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Colors.white.withOpacity(0.05),
@@ -606,6 +591,7 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
         style: GoogleFonts.jetBrainsMono(
           fontSize: 12,
           height: 1.6,
+          color: Colors.white70,
         ),
         children: spans,
       ),
@@ -634,7 +620,7 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
       ));
       spans.add(TextSpan(
         text: key,
-        style: const TextStyle(color: AppColors.primary),
+        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600),
       ));
       spans.add(TextSpan(
         text: '"',
@@ -677,7 +663,7 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
     if (trimmed.startsWith('"')) {
       spans.add(TextSpan(
         text: value,
-        style: const TextStyle(color: Colors.white70),
+        style: const TextStyle(color: Colors.white),
       ));
     } else if (trimmed == '{' ||
         trimmed == '[' ||
@@ -697,17 +683,17 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
         trimmed == 'false,') {
       spans.add(TextSpan(
         text: value,
-        style: TextStyle(color: AppColors.secondary),
+        style: TextStyle(color: Colors.white.withOpacity(0.8)),
       ));
     } else if (trimmed == 'null' || trimmed == 'null,') {
       spans.add(TextSpan(
         text: value,
-        style: TextStyle(color: AppColors.tertiary.withOpacity(0.7)),
+        style: TextStyle(color: Colors.white.withOpacity(0.5)),
       ));
     } else {
       spans.add(TextSpan(
         text: value,
-        style: TextStyle(color: AppColors.secondary),
+        style: const TextStyle(color: Colors.white70),
       ));
     }
   }
@@ -723,11 +709,11 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 color: _isCopied
-                    ? Colors.green.withOpacity(0.2)
+                    ? Colors.white.withOpacity(0.15)
                     : Colors.white.withOpacity(0.06),
                 border: Border.all(
                   color: _isCopied
-                      ? Colors.green.withOpacity(0.5)
+                      ? Colors.white.withOpacity(0.3)
                       : Colors.white.withOpacity(0.1),
                   width: 1,
                 ),
@@ -750,7 +736,7 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
                                 : Icons.copy_rounded,
                             key: ValueKey(_isCopied),
                             size: 16,
-                            color: _isCopied ? Colors.green : Colors.white70,
+                            color: _isCopied ? Colors.white : Colors.white70,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -762,7 +748,7 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: _isCopied ? Colors.green : Colors.white70,
+                              color: _isCopied ? Colors.white : Colors.white70,
                             ),
                           ),
                         ),
@@ -778,14 +764,9 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                gradient: LinearGradient(
-                  colors: [
-                    widget.accentColor.withOpacity(0.3),
-                    widget.accentColor.withOpacity(0.15),
-                  ],
-                ),
+                color: Colors.white.withOpacity(0.1),
                 border: Border.all(
-                  color: widget.accentColor.withOpacity(0.4),
+                  color: Colors.white.withOpacity(0.2),
                   width: 1,
                 ),
               ),
@@ -799,15 +780,15 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.save_alt_rounded,
-                            size: 16, color: widget.accentColor),
+                        const Icon(Icons.save_alt_rounded,
+                            size: 16, color: Colors.white),
                         const SizedBox(width: 6),
                         Text(
                           'Save as Prompt',
                           style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: widget.accentColor,
+                            color: Colors.white,
                           ),
                         ),
                       ],

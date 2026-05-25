@@ -158,11 +158,11 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         color: isSelected
-                            ? AppColors.primary.withOpacity(0.3)
+                            ? Colors.white.withOpacity(0.15)
                             : Colors.white.withOpacity(0.05),
                         border: Border.all(
                           color: isSelected
-                              ? AppColors.primary
+                              ? Colors.white70
                               : Colors.transparent,
                           width: 2,
                         ),
@@ -217,7 +217,7 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                   style: GoogleFonts.inter(fontSize: 14)),
             ],
           ),
-          backgroundColor: AppColors.tertiary.withOpacity(0.9),
+          backgroundColor: Colors.white24,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
@@ -261,13 +261,14 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
           style: GoogleFonts.inter(
             fontWeight: FontWeight.w700,
             fontSize: 20,
+            color: Colors.white,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -286,14 +287,12 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
               _buildSectionHeader(
                 icon: Icons.psychology_rounded,
                 title: 'Personality Traits',
-                color: AppColors.primary,
               ),
               const SizedBox(height: 12),
               _buildChipsSection(
                 items: _personalityTraits,
                 onDelete: (item) =>
                     setState(() => _personalityTraits.remove(item)),
-                color: AppColors.primary,
               ),
               const SizedBox(height: 12),
               _buildAddField(
@@ -301,7 +300,6 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                 focusNode: _traitFocusNode,
                 hint: 'Add a personality trait...',
                 onAdd: _addTrait,
-                color: AppColors.primary,
               ),
               const SizedBox(height: 12),
               _buildSuggestedChips(
@@ -312,20 +310,17 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                     _personalityTraits.add(trait);
                   }
                 }),
-                color: AppColors.primary,
               ),
               const SizedBox(height: 32),
               _buildSectionHeader(
                 icon: Icons.place_rounded,
                 title: 'Situation Points',
-                color: AppColors.secondary,
               ),
               const SizedBox(height: 12),
               _buildChipsSection(
                 items: _situationPoints,
                 onDelete: (item) =>
                     setState(() => _situationPoints.remove(item)),
-                color: AppColors.secondary,
               ),
               const SizedBox(height: 12),
               _buildAddField(
@@ -333,7 +328,6 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                 focusNode: _situationFocusNode,
                 hint: 'Add a situation point...',
                 onAdd: _addSituation,
-                color: AppColors.secondary,
               ),
               const SizedBox(height: 12),
               _buildSuggestedChips(
@@ -344,7 +338,6 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                     _situationPoints.add(situation);
                   }
                 }),
-                color: AppColors.secondary,
               ),
               const SizedBox(height: 40),
               _buildSaveButton(),
@@ -366,25 +359,11 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
               height: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppColors.primary.withOpacity(0.25),
-                    AppColors.secondary.withOpacity(0.15),
-                  ],
-                ),
+                color: Colors.white.withOpacity(0.08),
                 border: Border.all(
-                  color: AppColors.primary.withOpacity(0.4),
+                  color: Colors.white.withOpacity(0.2),
                   width: 2.5,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.2),
-                    blurRadius: 24,
-                    spreadRadius: 4,
-                  ),
-                ],
               ),
               child: Center(
                 child: Text(
@@ -398,7 +377,7 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.edit_rounded,
-                    size: 14, color: AppColors.primary.withOpacity(0.7)),
+                    size: 14, color: Colors.white54),
                 const SizedBox(width: 4),
                 Text(
                   'Tap to change',
@@ -455,7 +434,7 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
               ),
               prefixIcon: Icon(
                 Icons.person_rounded,
-                color: AppColors.primary.withOpacity(0.6),
+                color: Colors.white54,
                 size: 22,
               ),
               border: InputBorder.none,
@@ -467,21 +446,6 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
             textCapitalization: TextCapitalization.words,
           ),
         ),
-        const SizedBox(height: 4),
-        Container(
-          height: 3,
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(2),
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primary,
-                AppColors.secondary,
-                AppColors.primary.withOpacity(0.0),
-              ],
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -489,7 +453,6 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
   Widget _buildSectionHeader({
     required IconData icon,
     required String title,
-    required Color color,
   }) {
     return Row(
       children: [
@@ -497,9 +460,10 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: color.withOpacity(0.15),
+            color: Colors.white.withOpacity(0.08),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
           ),
-          child: Icon(icon, size: 18, color: color),
+          child: Icon(icon, size: 18, color: Colors.white70),
         ),
         const SizedBox(width: 12),
         Text(
@@ -518,7 +482,6 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
   Widget _buildChipsSection({
     required List<String> items,
     required Function(String) onDelete,
-    required Color color,
   }) {
     if (items.isEmpty) {
       return Container(
@@ -526,9 +489,9 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: AppColors.surface.withOpacity(0.5),
+          color: AppColors.surface,
           border: Border.all(
-            color: Colors.white.withOpacity(0.04),
+            color: Colors.white.withOpacity(0.06),
             width: 1,
           ),
         ),
@@ -559,10 +522,10 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                 color: Colors.white.withOpacity(0.9),
               ),
             ),
-            deleteIcon: Icon(Icons.close_rounded, size: 16, color: color),
+            deleteIcon: const Icon(Icons.close_rounded, size: 16, color: Colors.white54),
             onDeleted: () => onDelete(item),
-            backgroundColor: color.withOpacity(0.15),
-            side: BorderSide(color: color.withOpacity(0.3), width: 1),
+            backgroundColor: Colors.white.withOpacity(0.1),
+            side: BorderSide(color: Colors.white.withOpacity(0.15), width: 1),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
@@ -578,7 +541,6 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
     required FocusNode focusNode,
     required String hint,
     required VoidCallback onAdd,
-    required Color color,
   }) {
     return Row(
       children: [
@@ -588,7 +550,7 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
               borderRadius: BorderRadius.circular(12),
               color: AppColors.surface,
               border: Border.all(
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withOpacity(0.08),
                 width: 1,
               ),
             ),
@@ -624,19 +586,10 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
             height: 44,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                colors: [color, color.withOpacity(0.7)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+              color: Colors.white,
             ),
             child: const Center(
-              child: Icon(Icons.add_rounded, color: Colors.white, size: 24),
+              child: Icon(Icons.add_rounded, color: Colors.black, size: 24),
             ),
           ),
         ),
@@ -648,7 +601,6 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
     required List<String> suggestions,
     required List<String> existing,
     required Function(String) onTap,
-    required Color color,
   }) {
     final available =
         suggestions.where((s) => !existing.contains(s)).toList();
@@ -683,14 +635,14 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                   borderRadius: BorderRadius.circular(20),
                   color: Colors.white.withOpacity(0.04),
                   border: Border.all(
-                    color: color.withOpacity(0.2),
+                    color: Colors.white.withOpacity(0.1),
                     width: 1,
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.add_rounded, size: 14, color: color.withOpacity(0.6)),
+                    const Icon(Icons.add_rounded, size: 14, color: Colors.white54),
                     const SizedBox(width: 4),
                     Text(
                       item,
@@ -714,15 +666,9 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
     return Container(
       width: double.infinity,
       height: 56,
-      decoration: AppDecorations.accentGradient.copyWith(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -735,7 +681,7 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
               children: [
                 Icon(
                   _isEditing ? Icons.check_rounded : Icons.add_rounded,
-                  color: Colors.white,
+                  color: Colors.black,
                   size: 22,
                 ),
                 const SizedBox(width: 10),
@@ -744,7 +690,7 @@ class _CharacterEditorScreenState extends State<CharacterEditorScreen>
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: Colors.black,
                     letterSpacing: 0.5,
                   ),
                 ),
