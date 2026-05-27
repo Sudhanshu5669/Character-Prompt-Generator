@@ -37,6 +37,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
     'random': TextEditingController(),
   };
   int _promptCount = 5;
+  final TextEditingController _additionalContextController = TextEditingController();
 
   GenerationProvider? _generationProvider;
 
@@ -54,6 +55,7 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
   @override
   void dispose() {
     _generationProvider?.removeListener(_onGenerationChanged);
+    _additionalContextController.dispose();
     for (final c in _hintControllers.values) {
       c.dispose();
     }
@@ -752,6 +754,56 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
           ),
         ),
 
+        const SizedBox(height: 14),
+
+        // ── Additional Context field ──
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: AppColors.cardColor,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.notes_rounded, size: 15, color: Colors.white54),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Additional Context',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    'optional',
+                    style: GoogleFonts.inter(fontSize: 10, color: Colors.white24),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _additionalContextController,
+                style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+                maxLines: 3,
+                minLines: 1,
+                decoration: InputDecoration(
+                  hintText: 'e.g., keep the lighting warm, avoid outdoor scenes, use realistic style...',
+                  hintStyle: GoogleFonts.inter(fontSize: 12, color: Colors.white24),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ),
+
         const SizedBox(height: 16),
 
         // ── Generate button ──
@@ -838,19 +890,15 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
       selectedCategories['random'] = '';
     }
 
-    // Determine single type string for legacy provider param.
-    // If multiple categories selected, use first non-random key;
-    // provider internally uses selectedCategories map for the prompt.
-    final type = selectedCategories.keys.first;
-    final clothesHint = selectedCategories['clothes'];
+    final additionalContext = _additionalContextController.text.trim();
 
     // Fire-and-forget — navigation is handled reactively by _onGenerationChanged
     generationProvider.generateVariations(
       prompt: prompt,
       config: settingsProvider.config,
-      type: type,
+      selectedCategories: selectedCategories,
       character: _selectedCharacter,
-      clothesInstructions: clothesHint,
+      additionalContext: additionalContext.isNotEmpty ? additionalContext : null,
       referencePrompt: referencePrompt,
       count: _promptCount,
     );

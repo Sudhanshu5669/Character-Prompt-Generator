@@ -31,9 +31,9 @@ class GenerationProvider extends ChangeNotifier {
   Future<void> generateVariations({
     required Prompt prompt,
     required ApiConfig config,
-    required String type,
+    required Map<String, String> selectedCategories,
     Character? character,
-    String? clothesInstructions,
+    String? additionalContext,
     Prompt? referencePrompt,
     int count = 5,
   }) async {
@@ -42,10 +42,6 @@ class GenerationProvider extends ChangeNotifier {
     generatedVariations = [];
     notifyListeners();
 
-    // Convert single type to selectedCategories map for internal use
-    final selectedCategories = <String, String>{
-      type: clothesInstructions ?? '',
-    };
     try {
       final provider = _getProvider(config);
 
@@ -53,6 +49,7 @@ class GenerationProvider extends ChangeNotifier {
         prompt: prompt,
         selectedCategories: selectedCategories,
         character: character,
+        additionalContext: additionalContext,
         referencePrompt: referencePrompt,
         count: count,
       );
@@ -112,6 +109,7 @@ class GenerationProvider extends ChangeNotifier {
     required Prompt prompt,
     required Map<String, String> selectedCategories,
     Character? character,
+    String? additionalContext,
     Prompt? referencePrompt,
     int count = 5,
   }) {
@@ -216,6 +214,16 @@ class GenerationProvider extends ChangeNotifier {
           'Situations: ${character.situationPoints.join(", ")}',
         );
       }
+    }
+
+    if ((additionalContext ?? '').trim().isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln(
+        'ADDITIONAL CONTEXT — The user wants you to follow these extra instructions '
+        'that may not fit into the categories above. Treat them as hard constraints '
+        'and apply them to EVERY generated variation:',
+      );
+      buffer.writeln(additionalContext);
     }
 
     return buffer.toString();
