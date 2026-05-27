@@ -148,26 +148,41 @@ class _GenerationScreenState extends State<GenerationScreen>
       ),
       body: Consumer<GenerationProvider>(
         builder: (context, provider, _) {
-          if (provider.isGenerating) {
-            return _buildLoadingState();
+          final hasActive = provider.activeVariation != null && provider.activeVariation!.isNotEmpty;
+
+          Widget currentWidget;
+          if (provider.isGenerating &&
+              provider.generatedVariations.isEmpty &&
+              !hasActive) {
+            currentWidget = _buildLoadingState(key: const ValueKey('loading'));
+          } else if (!provider.isGenerating &&
+              provider.error != null &&
+              provider.generatedVariations.isEmpty) {
+            currentWidget = _buildErrorState(provider.error!, key: const ValueKey('error'));
+          } else if (!provider.isGenerating &&
+              provider.generatedVariations.isEmpty) {
+            currentWidget = _buildEmptyState(key: const ValueKey('empty'));
+          } else {
+            currentWidget = _buildVariationsList(
+              provider.generatedVariations,
+              provider.activeVariation,
+              provider.isGenerating,
+              key: const ValueKey('list'),
+            );
           }
 
-          if (provider.error != null) {
-            return _buildErrorState(provider.error!);
-          }
-
-          if (provider.generatedVariations.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          return _buildVariationsList(provider.generatedVariations);
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: currentWidget,
+          );
         },
       ),
     );
   }
 
-  Widget _buildLoadingState() {
+  Widget _buildLoadingState({Key? key}) {
     return Center(
+      key: key,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -234,8 +249,9 @@ class _GenerationScreenState extends State<GenerationScreen>
     );
   }
 
-  Widget _buildErrorState(String error) {
+  Widget _buildErrorState(String error, {Key? key}) {
     return Center(
+      key: key,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Container(
@@ -312,8 +328,9 @@ class _GenerationScreenState extends State<GenerationScreen>
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({Key? key}) {
     return Center(
+      key: key,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -336,31 +353,105 @@ class _GenerationScreenState extends State<GenerationScreen>
     );
   }
 
-  Widget _buildVariationsList(List<Map<String, dynamic>> variations) {
+  Widget _buildVariationsList(
+      List<Map<String, dynamic>> variations,
+      Map<String, dynamic>? activeVariation,
+      bool isStillGenerating,
+      {Key? key}) {
+    final hasActive = activeVariation != null && activeVariation.isNotEmpty;
+    final totalCount = variations.length + (hasActive ? 1 : 0) + (isStillGenerating ? 1 : 0);
+
     return Stack(
+      key: key,
       children: [
         ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-          itemCount: variations.length,
+          itemCount: totalCount,
           itemBuilder: (context, index) {
-            // Extract change title
+            // Case 1: Streaming indicator at the bottom
+            if (isStillGenerating && index == totalCount - 1) {
+              return _buildStreamingIndicator();
+            }
+
+            // Case 2: Active variation card
+            if (hasActive && index == variations.length) {
+              final changeTitle = activeVariation['_change_title'] as String? ?? 'Generating...';
+              return _AnimatedVariationCard(
+                key: const ValueKey('active_variation_card'),
+                index: index,
+                variation: activeVariation,
+                changeTitle: changeTitle,
+                onCopy: () {},
+                onSave: () {},
+                isGenerating: true,
+              );
+            }
+
+            // Case 3: Completed variation card
             final changeTitle = variations[index]['_change_title'] as String?;
             return _AnimatedVariationCard(
+              key: ValueKey('completed_card_$index'),
               index: index,
               variation: variations[index],
               changeTitle: changeTitle,
               onCopy: () => _copySingle(variations[index]),
               onSave: () => _saveAsPrompt(variations[index], index),
+              isGenerating: false,
             );
           },
         ),
-        Positioned(
-          bottom: 24,
-          left: 24,
-          right: 24,
-          child: _buildCopyAllButton(variations),
-        ),
+        if (!isStillGenerating)
+          Positioned(
+            bottom: 24,
+            left: 24,
+            right: 24,
+            child: _buildCopyAllButton(variations),
+          ),
       ],
+    );
+  }
+
+  Widget _buildStreamingIndicator() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: BoxDecoration(
+        color: AppColors.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+        ),
+      ),
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withValues(
+                        alpha: 0.5 + (0.3 * _pulseController.value)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Generating more variations...',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: Colors.white54,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -413,13 +504,16 @@ class _AnimatedVariationCard extends StatefulWidget {
   final String? changeTitle;
   final VoidCallback onCopy;
   final VoidCallback onSave;
+  final bool isGenerating;
 
   const _AnimatedVariationCard({
+    super.key,
     required this.index,
     required this.variation,
     this.changeTitle,
     required this.onCopy,
     required this.onSave,
+    this.isGenerating = false,
   });
 
   @override
@@ -699,6 +793,33 @@ class _AnimatedVariationCardState extends State<_AnimatedVariationCard>
   }
 
   Widget _buildFooter() {
+    if (widget.isGenerating) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white54),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Streaming response...',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: Colors.white54,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(

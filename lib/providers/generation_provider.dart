@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:prompt_generator/models/prompt.dart';
 import 'package:prompt_generator/models/character.dart';
@@ -9,6 +11,7 @@ import 'package:prompt_generator/core/utils/json_utils.dart';
 
 class GenerationProvider extends ChangeNotifier {
   List<Map<String, dynamic>> generatedVariations = [];
+  Map<String, dynamic>? activeVariation;
   bool isGenerating = false;
   String? error;
 
@@ -57,49 +60,101 @@ class GenerationProvider extends ChangeNotifier {
       final userPrompt =
           'Here is the base prompt JSON to generate variations from:\n\n${prompt.jsonContent}';
 
-      final response = await provider.generateContent(
-        systemPrompt,
-        userPrompt,
-      );
+      final parser = _IncrementalJsonParser();
 
-      final parsed = tryParseJsonArray(response);
+      await for (final chunk
+          in provider.generateContentStream(systemPrompt, userPrompt)) {
+        final newObjects = parser.addChunk(chunk);
 
-      if (parsed == null || parsed.isEmpty) {
-        error = 'Failed to parse AI response as a valid JSON array. '
-            'The AI may have returned an invalid format. Please try again.';
-        isGenerating = false;
-        notifyListeners();
-        return;
-      }
+        // Update active variation with the currently incomplete JSON object in the buffer
+        final remaining = parser.remainingText.trim();
+        final incompleteObject = _extractIncompleteObject(remaining);
+        if (incompleteObject != null) {
+          final partial = parsePartialJson(incompleteObject);
+          if (prompt.jsonContent.isNotEmpty && prompt.lockedFields.isNotEmpty) {
+            activeVariation = mergeWithLocks(
+              prompt.jsonContent,
+              partial,
+              prompt.lockedFields,
+            );
+            final changeTitle = partial['_change_title'] as String?;
+            if (changeTitle != null) {
+              activeVariation!['_change_title'] = changeTitle;
+            }
+          } else {
+            activeVariation = partial;
+          }
+        } else {
+          activeVariation = null;
+        }
 
-      final baseJson = prompt.jsonContent;
-      final List<Map<String, dynamic>> results = [];
-
-      for (final variation in parsed) {
-        if (variation is Map<String, dynamic>) {
+        for (final variation in newObjects) {
           final changeTitle = variation['_change_title'] as String?;
 
-          if (baseJson.isNotEmpty && prompt.lockedFields.isNotEmpty) {
-            final merged = mergeWithLocks(
-              baseJson,
+          Map<String, dynamic> processed;
+          if (prompt.jsonContent.isNotEmpty &&
+              prompt.lockedFields.isNotEmpty) {
+            processed = mergeWithLocks(
+              prompt.jsonContent,
               variation,
               prompt.lockedFields,
             );
             if (changeTitle != null) {
-              merged['_change_title'] = changeTitle;
+              processed['_change_title'] = changeTitle;
             }
-            results.add(merged);
           } else {
-            results.add(variation);
+            processed = variation;
           }
+
+          generatedVariations = [...generatedVariations, processed];
+          activeVariation = null; // Clear active since it has been completed
+        }
+        notifyListeners();
+      }
+
+      activeVariation = null; // Ensure cleared at the end
+      notifyListeners();
+
+      // Fallback: if streaming parser didn't yield objects, try full-text parse
+      if (generatedVariations.isEmpty) {
+        final fullText = parser.remainingText;
+        final parsed = tryParseJsonArray(fullText);
+        if (parsed != null && parsed.isNotEmpty) {
+          final List<Map<String, dynamic>> results = [];
+          for (final variation in parsed) {
+            if (variation is Map<String, dynamic>) {
+              final changeTitle = variation['_change_title'] as String?;
+              if (prompt.jsonContent.isNotEmpty &&
+                  prompt.lockedFields.isNotEmpty) {
+                final merged = mergeWithLocks(
+                  prompt.jsonContent,
+                  variation,
+                  prompt.lockedFields,
+                );
+                if (changeTitle != null) {
+                  merged['_change_title'] = changeTitle;
+                }
+                results.add(merged);
+              } else {
+                results.add(variation);
+              }
+            }
+          }
+          generatedVariations = results;
         }
       }
 
-      generatedVariations = results;
+      if (generatedVariations.isEmpty) {
+        error = 'Failed to parse AI response as a valid JSON array. '
+            'The AI may have returned an invalid format. Please try again.';
+      }
+
       isGenerating = false;
       notifyListeners();
     } catch (e) {
-      error = 'Generation failed: ${e.toString()}';
+      if (generatedVariations.isEmpty) {
+        error = 'Generation failed: ${e.toString()}';
+      }
       isGenerating = false;
       notifyListeners();
     }
@@ -307,7 +362,212 @@ class GenerationProvider extends ChangeNotifier {
 
   void clearResults() {
     generatedVariations = [];
+    activeVariation = null;
     error = null;
     notifyListeners();
+  }
+
+  String? _extractIncompleteObject(String text) {
+    final idx = text.lastIndexOf('{');
+    if (idx == -1) return null;
+    final lastClose = text.lastIndexOf('}');
+    if (lastClose > idx) {
+      return null;
+    }
+    return text.substring(idx);
+  }
+
+  Map<String, dynamic> parsePartialJson(String jsonStr) {
+    final Map<String, dynamic> result = {};
+    int i = 0;
+    
+    final firstBrace = jsonStr.indexOf('{');
+    if (firstBrace == -1) return result;
+    i = firstBrace + 1;
+    
+    String? currentKey;
+    final StringBuffer currentVal = StringBuffer();
+    bool inString = false;
+    bool escaped = false;
+    bool readingKey = false;
+    bool readingValue = false;
+    
+    while (i < jsonStr.length) {
+      final c = jsonStr[i];
+      
+      if (escaped) {
+        if (readingValue && currentKey != null) {
+          currentVal.write(c);
+        }
+        escaped = false;
+        i++;
+        continue;
+      }
+      
+      if (c == '\\') {
+        escaped = true;
+        i++;
+        continue;
+      }
+      
+      if (c == '"') {
+        inString = !inString;
+        if (inString) {
+          if (!readingValue) {
+            readingKey = true;
+            currentVal.clear();
+          } else {
+            currentVal.clear();
+          }
+        } else {
+          if (readingKey) {
+            currentKey = currentVal.toString();
+            readingKey = false;
+          } else if (readingValue && currentKey != null) {
+            result[currentKey] = currentVal.toString();
+            readingValue = false;
+            currentKey = null;
+          }
+        }
+        i++;
+        continue;
+      }
+      
+      if (inString) {
+        if (readingKey || readingValue) {
+          currentVal.write(c);
+        }
+        i++;
+        continue;
+      }
+      
+      if (c == ':') {
+        if (currentKey != null) {
+          readingValue = true;
+          currentVal.clear();
+        }
+      } else if (c == ',' || c == '}') {
+        if (readingValue && currentKey != null) {
+          final valStr = currentVal.toString().trim();
+          if (valStr.isNotEmpty) {
+            if (valStr == 'true') result[currentKey] = true;
+            else if (valStr == 'false') result[currentKey] = false;
+            else if (valStr == 'null') result[currentKey] = null;
+            else {
+              final numVal = num.tryParse(valStr);
+              if (numVal != null) {
+                result[currentKey] = numVal;
+              } else {
+                result[currentKey] = valStr;
+              }
+            }
+          }
+          readingValue = false;
+          currentKey = null;
+        }
+      } else {
+        if (readingValue && !inString) {
+          currentVal.write(c);
+        }
+      }
+      
+      i++;
+    }
+    
+    if (readingValue && currentKey != null) {
+      result[currentKey] = currentVal.toString();
+    }
+    
+    return result;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Incremental JSON array parser for streaming
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _IncrementalJsonParser {
+  final StringBuffer _buffer = StringBuffer();
+  bool _foundArrayStart = false;
+
+  /// Returns any unparsed text still in the buffer.
+  String get remainingText => _buffer.toString();
+
+  /// Appends [chunk] to the internal buffer and returns any newly completed
+  /// top-level JSON objects found within the array.
+  List<Map<String, dynamic>> addChunk(String chunk) {
+    _buffer.write(chunk);
+    return _extractObjects();
+  }
+
+  List<Map<String, dynamic>> _extractObjects() {
+    final text = _buffer.toString();
+    final results = <Map<String, dynamic>>[];
+
+    int searchFrom = 0;
+
+    // Wait for the opening '[' of the JSON array.
+    if (!_foundArrayStart) {
+      final idx = text.indexOf('[');
+      if (idx == -1) return results;
+      _foundArrayStart = true;
+      searchFrom = idx + 1;
+    }
+
+    // Walk the text tracking brace depth to find complete objects.
+    int depth = 0;
+    bool inString = false;
+    bool escaped = false;
+    int? objectStart;
+    int lastObjectEnd = -1;
+
+    for (int i = searchFrom; i < text.length; i++) {
+      final c = text[i];
+
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (c == '\\' && inString) {
+        escaped = true;
+        continue;
+      }
+
+      if (c == '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (c == '{') {
+        if (depth == 0) objectStart = i;
+        depth++;
+      } else if (c == '}') {
+        depth--;
+        if (depth == 0 && objectStart != null) {
+          final objectStr = text.substring(objectStart, i + 1);
+          try {
+            final obj = jsonDecode(objectStr);
+            if (obj is Map<String, dynamic>) {
+              results.add(obj);
+              lastObjectEnd = i;
+            }
+          } catch (_) {
+            // Not valid JSON yet — continue accumulating.
+          }
+          objectStart = null;
+        }
+      }
+    }
+
+    // Trim the buffer to remove already-parsed content.
+    if (lastObjectEnd >= 0) {
+      _buffer.clear();
+      _buffer.write(text.substring(lastObjectEnd + 1));
+    }
+
+    return results;
   }
 }

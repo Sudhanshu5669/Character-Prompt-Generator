@@ -39,6 +39,8 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
   int _promptCount = 5;
   final TextEditingController _additionalContextController = TextEditingController();
 
+  bool _hasNavigatedToGeneration = false;
+
   GenerationProvider? _generationProvider;
 
   @override
@@ -65,9 +67,8 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
   void _onGenerationChanged() {
     final provider = _generationProvider;
     if (provider == null || !mounted) return;
-    if (!provider.isGenerating && provider.error == null && provider.generatedVariations.isNotEmpty) {
-      Navigator.pushNamed(context, AppRoutes.generation);
-    } else if (!provider.isGenerating && provider.error != null) {
+
+    if (!provider.isGenerating && provider.error != null) {
       _showErrorDialog(provider.error!);
     }
   }
@@ -851,6 +852,8 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
     SettingsProvider settingsProvider,
     GenerationProvider generationProvider,
   ) {
+    _hasNavigatedToGeneration = false;
+
     if (!settingsProvider.hasValidApiKey) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -892,7 +895,9 @@ class _PromptDetailScreenState extends State<PromptDetailScreen> {
 
     final additionalContext = _additionalContextController.text.trim();
 
-    // Fire-and-forget — navigation is handled reactively by _onGenerationChanged
+    // Navigate immediately to allow the user to watch prompt variations stream in real-time
+    Navigator.pushNamed(context, AppRoutes.generation);
+
     generationProvider.generateVariations(
       prompt: prompt,
       config: settingsProvider.config,

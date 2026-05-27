@@ -38,7 +38,6 @@ class FireworksProvider implements AiProvider {
             {'role': 'system', 'content': systemPrompt},
             {'role': 'user', 'content': userPrompt},
           ],
-          'max_tokens': 4096,
           'temperature': 0.8,
         },
       );
@@ -79,16 +78,66 @@ class FireworksProvider implements AiProvider {
       return content;
     } on DioException catch (e) {
       if (e.response != null) {
-        // Server responded with an error HTTP code
         final statusCode = e.response!.statusCode;
         final body = e.response!.data;
         throw Exception(
           'Fireworks request failed (HTTP $statusCode): $body',
         );
       } else {
-        // No response at all — connection-level failure
         throw Exception(
           'Fireworks connection failed [${e.type.name}]: ${e.message ?? e.error ?? "No details"}',
+        );
+      }
+    }
+  }
+
+  @override
+  Stream<String> generateContentStream(
+    String systemPrompt,
+    String userPrompt,
+  ) async* {
+    final url = '${AppConstants.fireworksBaseUrl}/chat/completions';
+
+    try {
+      final response = await _dio.post<ResponseBody>(
+        url,
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {
+            'Authorization': 'Bearer $_apiKey',
+          },
+        ),
+        data: {
+          'model': _model,
+          'messages': [
+            {'role': 'system', 'content': systemPrompt},
+            {'role': 'user', 'content': userPrompt},
+          ],
+          'temperature': 0.8,
+          'stream': true,
+        },
+      );
+
+      yield* parseSseStream(
+        response.data!.stream,
+        (data) {
+          final choices = data['choices'] as List<dynamic>?;
+          if (choices == null || choices.isEmpty) return null;
+          final delta =
+              choices[0]['delta'] as Map<String, dynamic>?;
+          return delta?['content'] as String?;
+        },
+      );
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final errorBody = await getStreamErrorBody(e);
+        throw Exception(
+          'Fireworks stream request failed (HTTP $statusCode): $errorBody',
+        );
+      } else {
+        throw Exception(
+          'Fireworks stream connection failed [${e.type.name}]: ${e.message ?? e.error ?? "No details"}',
         );
       }
     }
